@@ -10,11 +10,10 @@ value class DocumentId(val value: UUID) {
     companion object {
         fun generate(): DocumentId = DocumentId(UUID.randomUUID())
 
-        fun parse(raw: String): DocumentId =
-            try {
-                DocumentId(UUID.fromString(raw))
-            } catch (e: IllegalArgumentException) {
-                throw IllegalArgumentException("Identifiant de document invalide : $raw", e)
-            }
+        fun parse(raw: String): DocumentId = try {
+            DocumentId(UUID.fromString(raw))
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Identifiant de document invalide : $raw", e)
+        }
     }
 }

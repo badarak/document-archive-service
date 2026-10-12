@@ -21,6 +21,13 @@ class DocumentIdTest {
     }
 
     @Test
+    fun `toString expose la representation textuelle de l'UUID`() {
+        val uuid = UUID.randomUUID()
+
+        assertEquals(uuid.toString(), DocumentId(uuid).toString())
+    }
+
+    @Test
     fun `parse rejette une valeur qui n'est pas un UUID`() {
         assertThrows(IllegalArgumentException::class.java) { DocumentId.parse("pas-un-uuid") }
     }

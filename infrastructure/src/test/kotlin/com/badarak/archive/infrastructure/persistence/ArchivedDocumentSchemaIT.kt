@@ -33,7 +33,7 @@ class ArchivedDocumentSchemaIT {
     fun `liquibase creates the archived_document table and its constraints at startup`() {
         val constraints = jdbcTemplate.queryForList(
             "SELECT lower(constraint_name) FROM information_schema.table_constraints " +
-                "WHERE lower(table_name) = 'archived_document'",
+                "WHERE lower(table_schema) = 'archive' AND lower(table_name) = 'archived_document'",
             String::class.java,
         )
 
@@ -50,7 +50,8 @@ class ArchivedDocumentSchemaIT {
     @Test
     fun `liquibase creates the index on source and business reference`() {
         val indexes = jdbcTemplate.queryForList(
-            "SELECT lower(index_name) FROM information_schema.indexes WHERE lower(table_name) = 'archived_document'",
+            "SELECT lower(index_name) FROM information_schema.indexes " +
+                "WHERE lower(table_schema) = 'archive' AND lower(table_name) = 'archived_document'",
             String::class.java,
         )
 
@@ -104,7 +105,7 @@ class ArchivedDocumentSchemaIT {
     }
 
     private fun appliedChangeSetCount(): Int? = jdbcTemplate.queryForObject(
-        "SELECT count(*) FROM databasechangelog WHERE id = '001-create-archived-document'",
+        "SELECT count(*) FROM archive.databasechangelog",
         Int::class.java,
     )
 }

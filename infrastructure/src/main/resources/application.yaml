@@ -5,6 +5,10 @@ spring:
     url: ${ARCHIVE_DB_URL}
     username: ${ARCHIVE_DB_USERNAME}
     password: ${ARCHIVE_DB_PASSWORD}
+  liquibase:
+    # The archive schema is provisioned outside the application and must exist before startup:
+    # Liquibase stores its tracking tables in it.
+    liquibase-schema: archive
   jpa:
     open-in-view: false
     hibernate:

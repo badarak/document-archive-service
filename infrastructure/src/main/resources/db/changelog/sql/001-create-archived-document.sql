@@ -1,4 +1,4 @@
-CREATE TABLE archived_document (
+CREATE TABLE archive.archived_document (
     id                 UUID          NOT NULL,
     document_type      VARCHAR(50)   NOT NULL,
     source             VARCHAR(100)  NOT NULL,
@@ -18,4 +18,4 @@ CREATE TABLE archived_document (
 );
 
 CREATE INDEX idx_archived_document_source_business_reference
-    ON archived_document (source, business_reference);
+    ON archive.archived_document (source, business_reference);

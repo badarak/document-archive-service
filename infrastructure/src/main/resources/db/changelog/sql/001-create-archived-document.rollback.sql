@@ -1,1 +1,1 @@
-DROP TABLE archived_document;
+DROP TABLE archive.archived_document;

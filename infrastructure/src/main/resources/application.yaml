@@ -1,3 +1,12 @@
 spring:
   application:
     name: document-archive-service
+  datasource:
+    url: ${ARCHIVE_DB_URL}
+    username: ${ARCHIVE_DB_USERNAME}
+    password: ${ARCHIVE_DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # The schema is owned by Liquibase; Hibernate only checks that entities match it.
+      ddl-auto: validate

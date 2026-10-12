@@ -1,0 +1,6 @@
+# Defaults matching compose.yaml, for local development only.
+spring:
+  datasource:
+    url: ${ARCHIVE_DB_URL:jdbc:postgresql://localhost:5432/archive}
+    username: ${ARCHIVE_DB_USERNAME:archive}
+    password: ${ARCHIVE_DB_PASSWORD:archive}

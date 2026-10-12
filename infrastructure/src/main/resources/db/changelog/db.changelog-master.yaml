@@ -1,0 +1,13 @@
+# Applied changesets are immutable: add a new changeset and SQL file instead of editing an existing one.
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-archived-document
+      author: badarak
+      changes:
+        - sqlFile:
+            path: sql/001-create-archived-document.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sqlFile:
+            path: sql/001-create-archived-document.rollback.sql
+            relativeToChangelogFile: true

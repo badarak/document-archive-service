@@ -1,0 +1,15 @@
+# Applied changesets are immutable: add a new changeset and SQL file instead of editing an existing one.
+# The archive schema is provisioned outside the application (docker/postgres/init locally): it is not
+# created by a changeset, because Liquibase stores its own tracking tables in it.
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-archived-document
+      author: badarak
+      changes:
+        - sqlFile:
+            path: sql/001-create-archived-document.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sqlFile:
+            path: sql/001-create-archived-document.rollback.sql
+            relativeToChangelogFile: true

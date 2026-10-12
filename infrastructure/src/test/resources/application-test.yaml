@@ -1,0 +1,6 @@
+# In-memory H2 in PostgreSQL compatibility mode, so the Liquibase SQL files run unchanged.
+spring:
+  datasource:
+    url: jdbc:h2:mem:archive;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;INIT=CREATE SCHEMA IF NOT EXISTS archive
+    username: sa
+    password:

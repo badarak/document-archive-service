@@ -95,6 +95,7 @@
                                     <directory>${project.basedir}/..</directory>
                                     <includes>
                                         <include>*/target/jacoco.exec</include>
+                                        <include>*/target/jacoco-it.exec</include>
                                     </includes>
                                 </fileSet>
                             </fileSets>

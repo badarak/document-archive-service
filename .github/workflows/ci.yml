@@ -26,7 +26,7 @@ jobs:
           java-version: 21
           cache: maven
 
-      # Runs tests, ktlint, the enforcer rules and the aggregated coverage threshold.
+      # Runs unit and integration tests, ktlint, the enforcer rules and the aggregated coverage threshold.
       - name: Build and verify
         run: ./mvnw -B -ntp clean verify
 

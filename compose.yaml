@@ -1,0 +1,17 @@
+# Local development services. Values come from the .env file (see .env.example).
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${ARCHIVE_DB_NAME:?set it in .env}
+      POSTGRES_USER: ${ARCHIVE_DB_USERNAME:?set it in .env}
+      POSTGRES_PASSWORD: ${ARCHIVE_DB_PASSWORD:?set it in .env}
+    ports:
+      - "${ARCHIVE_DB_PORT:?set it in .env}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Init scripts only run on an empty data volume: use "docker compose down -v" to replay them.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  pgdata:

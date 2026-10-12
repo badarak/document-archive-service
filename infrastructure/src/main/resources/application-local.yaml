@@ -1,0 +1,7 @@
+# Local development: the ARCHIVE_DB_* variables are read from the .env file (see .env.example),
+# whether the application is started from the project root or from the infrastructure module.
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]

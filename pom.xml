@@ -16,7 +16,7 @@
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>document-archive-service</name>
-    <description>Service transverse d'archivage de documents dans un stockage objet compatible S3</description>
+    <description>Shared service archiving documents into S3-compatible object storage</description>
 
     <modules>
         <module>domain</module>
@@ -26,13 +26,13 @@
     </modules>
 
     <properties>
-        <!-- La version de Kotlin est pilotée par le BOM Spring Boot (kotlin.version). -->
+        <!-- The Kotlin version is driven by the Spring Boot BOM (kotlin.version). -->
         <java.version>21</java.version>
         <mockk.version>1.14.11</mockk.version>
         <ktlint-maven-plugin.version>3.7.1</ktlint-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <jacoco.minimum-line-coverage>0.80</jacoco.minimum-line-coverage>
-        <!-- Les modules sont purs par défaut ; seul infrastructure désactive la règle. -->
+        <!-- Modules are framework-free by default; only infrastructure disables the rule. -->
         <archive.framework-ban.skip>false</archive.framework-ban.skip>
     </properties>
 
@@ -110,7 +110,7 @@
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco-maven-plugin.version}</version>
                 <configuration>
-                    <!-- Point d'entrée Spring Boot : sans logique à couvrir. -->
+                    <!-- Spring Boot entry point: no logic to cover. -->
                     <excludes>
                         <exclude>com/badarak/archive/DocumentArchiveApplication*</exclude>
                     </excludes>
@@ -160,7 +160,7 @@
                             <skip>${archive.framework-ban.skip}</skip>
                             <rules>
                                 <bannedDependencies>
-                                    <message>Le domaine et l'application doivent rester indépendants de Spring, JPA/Hibernate et de l'AWS SDK.</message>
+                                    <message>The domain and application modules must stay independent of Spring, JPA/Hibernate and the AWS SDK.</message>
                                     <excludes>
                                         <exclude>org.springframework*</exclude>
                                         <exclude>jakarta.persistence</exclude>

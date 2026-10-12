@@ -13,7 +13,7 @@ value class DocumentId(val value: UUID) {
         fun parse(raw: String): DocumentId = try {
             DocumentId(UUID.fromString(raw))
         } catch (e: IllegalArgumentException) {
-            throw IllegalArgumentException("Identifiant de document invalide : $raw", e)
+            throw IllegalArgumentException("Invalid document identifier: $raw", e)
         }
     }
 }

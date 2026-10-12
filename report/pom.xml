@@ -13,14 +13,14 @@
     <artifactId>report</artifactId>
     <packaging>pom</packaging>
     <name>report</name>
-    <description>Rapport JaCoCo agrégé et seuil de couverture global</description>
+    <description>Aggregated JaCoCo report and global coverage threshold</description>
 
     <properties>
-        <!-- Ce module ne contient pas de code : il référence infrastructure pour l'agrégation. -->
+        <!-- This module holds no code: it references infrastructure for aggregation. -->
         <archive.framework-ban.skip>true</archive.framework-ban.skip>
     </properties>
 
-    <!-- Tout module dont la couverture doit être agrégée est déclaré ici et dans copy-covered-classes. -->
+    <!-- Any module whose coverage must be aggregated is declared here and in copy-covered-classes. -->
     <dependencies>
         <dependency>
             <groupId>com.badarak</groupId>
@@ -38,7 +38,7 @@
 
     <build>
         <plugins>
-            <!-- jacoco:check n'a pas de variante agrégée : il contrôle les classes de son propre module. -->
+            <!-- jacoco:check has no aggregate variant: it checks the classes of its own module. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>

@@ -7,6 +7,6 @@ import org.springframework.boot.test.context.SpringBootTest
 class DocumentArchiveApplicationTest {
 
     @Test
-    fun `le contexte Spring demarre`() {
+    fun `Spring context starts`() {
     }
 }

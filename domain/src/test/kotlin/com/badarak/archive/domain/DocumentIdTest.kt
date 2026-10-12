@@ -9,19 +9,26 @@ import java.util.UUID
 class DocumentIdTest {
 
     @Test
-    fun `generate produit des identifiants distincts`() {
+    fun `generate produces distinct identifiers`() {
         assertNotEquals(DocumentId.generate(), DocumentId.generate())
     }
 
     @Test
-    fun `parse relit la representation textuelle d'un identifiant`() {
+    fun `parse reads back the text representation of an identifier`() {
         val uuid = UUID.randomUUID()
 
         assertEquals(DocumentId(uuid), DocumentId.parse(uuid.toString()))
     }
 
     @Test
-    fun `parse rejette une valeur qui n'est pas un UUID`() {
+    fun `toString exposes the text representation of the UUID`() {
+        val uuid = UUID.randomUUID()
+
+        assertEquals(uuid.toString(), DocumentId(uuid).toString())
+    }
+
+    @Test
+    fun `parse rejects a value that is not a UUID`() {
         assertThrows(IllegalArgumentException::class.java) { DocumentId.parse("pas-un-uuid") }
     }
 }

@@ -14,30 +14,30 @@ import java.util.UUID
 class ArchivedDocumentJpaEntity(
     @Id
     @Column(name = "id", nullable = false, updatable = false)
-    var id: UUID,
+    val id: UUID,
     @Column(name = "document_type", nullable = false, length = 50)
-    var documentType: String,
+    val documentType: String,
     @Column(name = "source", nullable = false, length = 100)
-    var source: String,
+    val source: String,
     @Column(name = "business_reference")
-    var businessReference: String?,
+    val businessReference: String?,
     @Column(name = "description", length = 1000)
-    var description: String?,
+    val description: String?,
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "tags", nullable = false)
-    var tags: Map<String, String>,
+    val tags: Map<String, String>,
     @Column(name = "file_name", nullable = false)
-    var fileName: String,
+    val fileName: String,
     @Column(name = "content_type", nullable = false)
-    var contentType: String,
+    val contentType: String,
     @Column(name = "size_bytes", nullable = false)
-    var sizeBytes: Long,
+    val sizeBytes: Long,
     @Column(name = "object_key", nullable = false, unique = true, length = 512)
-    var objectKey: String,
+    val objectKey: String,
     @Column(name = "status", nullable = false, length = 20)
     var status: String,
     @Column(name = "created_at", nullable = false, updatable = false)
-    var createdAt: Instant,
+    val createdAt: Instant,
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant,
 )

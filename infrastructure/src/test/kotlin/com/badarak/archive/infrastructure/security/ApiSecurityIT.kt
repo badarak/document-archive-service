@@ -41,13 +41,13 @@ class ApiSecurityIT {
     }
 
     @Test
-    fun `a token signed by a published key is accepted`() {
+    fun `a token signed by the identity provider is accepted`() {
         getDocuments(TestIdentityProvider.token(scope = READ)).andExpect { status { isOk() } }
     }
 
     @Test
-    fun `a token signed by an unknown key is rejected with 401`() {
-        getDocuments(TestIdentityProvider.token(signedWithPublishedKey = false)).andExpect { status { isUnauthorized() } }
+    fun `a token signed with a key the provider does not publish is rejected with 401`() {
+        getDocuments(TestIdentityProvider.token(signedByProvider = false)).andExpect { status { isUnauthorized() } }
     }
 
     @Test

@@ -4,3 +4,13 @@ spring:
     url: jdbc:h2:mem:archive;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;INIT=CREATE SCHEMA IF NOT EXISTS archive
     username: sa
     password:
+
+# Placeholder storage settings: the S3 client is built but never contacts a server in tests.
+archive:
+  storage:
+    s3:
+      endpoint: http://localhost:9000
+      region: us-east-1
+      bucket: test-bucket
+      access-key: test-access-key
+      secret-key: test-secret-key

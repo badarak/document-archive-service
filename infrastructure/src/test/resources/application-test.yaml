@@ -4,6 +4,14 @@ spring:
     url: jdbc:h2:mem:archive;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;INIT=CREATE SCHEMA IF NOT EXISTS archive
     username: sa
     password:
+  # Placeholder identity provider: only the tests that serve their own key set validate tokens.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://idp.test
+          jwk-set-uri: https://idp.test/jwks
+          audiences: document-archive-service
 
 # Placeholder storage settings: the S3 client is built but never contacts a server in tests.
 archive:

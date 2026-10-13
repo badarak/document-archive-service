@@ -22,7 +22,6 @@ class S3StorageConfiguration {
             StaticCredentialsProvider.create(AwsBasicCredentials.create(properties.accessKey, properties.secretKey)),
         )
         .forcePathStyle(properties.pathStyleAccess)
-        // The SDK's default integrity checksums are rejected by some S3-compatible stores.
         .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
         .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
         .build()

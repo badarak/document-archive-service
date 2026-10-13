@@ -14,6 +14,15 @@ spring:
     hibernate:
       # The schema is owned by Liquibase; Hibernate only checks that entities match it.
       ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Access tokens must come from this issuer, be signed by one of its published keys and
+          # be intended for this service. Setting both URIs avoids any call to the issuer at startup.
+          issuer-uri: ${ARCHIVE_JWT_ISSUER}
+          jwk-set-uri: ${ARCHIVE_JWT_JWKS_URI}
+          audiences: ${ARCHIVE_JWT_AUDIENCE}
 
 archive:
   storage:
@@ -24,3 +33,15 @@ archive:
       access-key: ${ARCHIVE_S3_ACCESS_KEY}
       secret-key: ${ARCHIVE_S3_SECRET_KEY}
       path-style-access: ${ARCHIVE_S3_PATH_STYLE_ACCESS:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only the health endpoint is reachable over HTTP; it is what the monitoring probes call.
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true

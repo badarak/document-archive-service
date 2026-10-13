@@ -76,7 +76,6 @@ class ArchivedDocument(
         const val CONTENT_TYPE_MAX_LENGTH = 255
         const val OBJECT_KEY_MAX_LENGTH = 512
 
-        /** Starts the archiving of a new document, in the initial status, once [sizePolicy] accepts its size. */
         fun create(
             id: DocumentId,
             documentType: DocumentType,

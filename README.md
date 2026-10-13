@@ -8,8 +8,6 @@ in PostgreSQL; the binary content goes to an S3-compatible object storage (MinIO
 - JDK 21
 - Docker with Docker Compose v2
 
-Maven is not required: the wrapper (`./mvnw`) downloads it.
-
 ## Local startup
 
 Run every command from the project root.
@@ -36,24 +34,18 @@ docker compose up -d
 
 ### 3. Create the bucket
 
-The bucket is not created automatically. Create it once per MinIO volume:
-
-```bash
-docker compose exec minio sh -c \
-  'mc alias set local http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" \
-   && mc mb --ignore-existing local/archive-documents'
-```
-
-`archive-documents` must match `ARCHIVE_S3_BUCKET` in `.env`.
+The bucket is not created automatically. Create it once per MinIO volume, from the MinIO console
+at <http://localhost:9001>. Its name must match `ARCHIVE_S3_BUCKET` in `.env` (`archive-documents`
+by default).
 
 ### 4. Start the application
 
 ```bash
-./mvnw package -DskipTests
-java -jar infrastructure/target/infrastructure-0.1.0-SNAPSHOT.jar --spring.profiles.active=local
+./mvnw spring-boot:run
 ```
 
-Liquibase creates or updates the tables at startup. Check that the service is up:
+The command builds the modules and starts the application with the `local` profile. Liquibase
+creates or updates the tables at startup. Check that the service is up:
 
 ```bash
 curl http://localhost:8080/actuator/health
@@ -79,7 +71,8 @@ The application has no default for these settings: it does not start if one is m
 ## The `local` profile
 
 The `local` profile only loads the `.env` file, so the application reads the same values as Docker
-Compose. Without it, the variables must be set in the environment.
+Compose. Without it, the variables must be set in the environment. `./mvnw spring-boot:run`
+activates it by itself.
 
 The file is looked up in the working directory and in its parent: start the application from the
 project root or from the `infrastructure` module. From an IDE, activate the `local` profile and keep

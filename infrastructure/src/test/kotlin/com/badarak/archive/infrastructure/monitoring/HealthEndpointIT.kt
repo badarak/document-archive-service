@@ -32,8 +32,8 @@ class HealthEndpointIT {
     }
 
     @Test
-    fun `no other actuator endpoint is exposed`() {
-        mockMvc.get("/actuator/info").andExpect { status { isNotFound() } }
-        mockMvc.get("/actuator/env").andExpect { status { isNotFound() } }
+    fun `other actuator paths are not open to anonymous callers`() {
+        mockMvc.get("/actuator/info").andExpect { status { isUnauthorized() } }
+        mockMvc.get("/actuator/env").andExpect { status { isUnauthorized() } }
     }
 }

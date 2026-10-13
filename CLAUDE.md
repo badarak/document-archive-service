@@ -37,7 +37,7 @@ If the analysis is larger than this, create a Markdown report.
 - Maven
 - PostgreSQL
 - Liquibase
-- JUnit 5
+- JUnit 6
 - MockK
 
 ## Architecture
@@ -84,7 +84,7 @@ Every new use case must have tests.
 
 Use:
 
-- JUnit 5
+- JUnit 6
 - Mockk
 
 Prefer unit tests for business logic.

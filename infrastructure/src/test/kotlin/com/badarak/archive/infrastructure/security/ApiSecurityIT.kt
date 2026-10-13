@@ -10,10 +10,15 @@ import org.springframework.http.HttpHeaders
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.web.servlet.MockHttpServletRequestDsl
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
@@ -37,7 +42,7 @@ class ApiSecurityIT {
 
     @Test
     fun `a token signed by a published key is accepted`() {
-        getDocuments(TestIdentityProvider.token()).andExpect { status { isOk() } }
+        getDocuments(TestIdentityProvider.token(scope = READ)).andExpect { status { isOk() } }
     }
 
     @Test
@@ -73,12 +78,46 @@ class ApiSecurityIT {
     }
 
     @Test
+    fun `a valid token without scope is rejected with 403`() {
+        getDocuments(TestIdentityProvider.token()).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `reading documents requires the read scope`() {
+        getDocuments(TestIdentityProvider.token(scope = WRITE)).andExpect { status { isForbidden() } }
+        getDocuments(TestIdentityProvider.token(scope = "profile $READ")).andExpect { status { isOk() } }
+        mockMvc.get("$DOCUMENTS/42") { bearer(TestIdentityProvider.token(scope = READ)) }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `archiving a document requires the write scope`() {
+        mockMvc.post(DOCUMENTS) { bearer(TestIdentityProvider.token(scope = READ)) }.andExpect { status { isForbidden() } }
+        mockMvc.post(DOCUMENTS) { bearer(TestIdentityProvider.token(scope = WRITE)) }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `deleting a document requires the write scope`() {
+        mockMvc.delete("$DOCUMENTS/42") { bearer(TestIdentityProvider.token(scope = READ)) }.andExpect { status { isForbidden() } }
+        mockMvc.delete("$DOCUMENTS/42") { bearer(TestIdentityProvider.token(scope = WRITE)) }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `a path outside the document API is closed even with every scope`() {
+        val token = TestIdentityProvider.token(scope = "$READ $WRITE")
+
+        mockMvc.get("/api/v1/other") { bearer(token) }.andExpect { status { isForbidden() } }
+        mockMvc.get("/actuator/env") { bearer(token) }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
     fun `the health endpoint needs no token`() {
         mockMvc.get("/actuator/health").andExpect { status { isOk() } }
         mockMvc.get("/actuator/health/readiness").andExpect { status { isOk() } }
     }
 
-    private fun getDocuments(token: String): ResultActionsDsl = mockMvc.get(DOCUMENTS) {
+    private fun getDocuments(token: String): ResultActionsDsl = mockMvc.get(DOCUMENTS) { bearer(token) }
+
+    private fun MockHttpServletRequestDsl.bearer(token: String) {
         header(HttpHeaders.AUTHORIZATION, "Bearer $token")
     }
 
@@ -89,10 +128,21 @@ class ApiSecurityIT {
 
         @GetMapping
         fun search(): String = "found"
+
+        @GetMapping("/{id}")
+        fun get(): String = "found"
+
+        @PostMapping
+        fun archive(): String = "archived"
+
+        @DeleteMapping("/{id}")
+        fun delete(): String = "deleted"
     }
 
     companion object {
         private const val DOCUMENTS = "/api/v1/documents"
+        private const val READ = "documents:read"
+        private const val WRITE = "documents:write"
 
         @JvmStatic
         @DynamicPropertySource

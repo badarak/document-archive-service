@@ -18,8 +18,9 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # Access tokens must come from this issuer, be signed by one of its published keys and
-          # be intended for this service. Setting both URIs avoids any call to the issuer at startup.
+          # Access tokens must come from this issuer, carry a signature that one of its published
+          # public keys verifies, and be intended for this service. Setting both URIs avoids any
+          # call to the issuer at startup.
           issuer-uri: ${ARCHIVE_JWT_ISSUER}
           jwk-set-uri: ${ARCHIVE_JWT_JWKS_URI}
           audiences: ${ARCHIVE_JWT_AUDIENCE}

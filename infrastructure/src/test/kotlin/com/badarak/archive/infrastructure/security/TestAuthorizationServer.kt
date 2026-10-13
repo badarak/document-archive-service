@@ -15,12 +15,12 @@ import java.time.Instant
 import java.util.Date
 
 /**
- * Stands in for the identity provider in integration tests: signs access tokens with its private
+ * Stands in for the authorization server in integration tests: signs access tokens with its private
  * key and publishes only the matching public key over HTTP. It lives as long as the test JVM, so
  * every test shares the same key set URI.
  */
-object TestIdentityProvider {
-    const val ISSUER = "https://idp.test"
+object TestAuthorizationServer {
+    const val ISSUER = "https://auth.test"
     const val AUDIENCE = "document-archive-service"
 
     private val signingKeyPair: RSAKey = generateKeyPair()
@@ -43,9 +43,9 @@ object TestIdentityProvider {
         audience: List<String> = listOf(AUDIENCE),
         expiresAt: Instant = Instant.now().plusSeconds(300),
         scope: String? = null,
-        signedByProvider: Boolean = true,
+        signedByServer: Boolean = true,
     ): String {
-        val keyPair = if (signedByProvider) signingKeyPair else foreignKeyPair
+        val keyPair = if (signedByServer) signingKeyPair else foreignKeyPair
         val claims = JWTClaimsSet.Builder()
             .issuer(issuer)
             .subject("billing-service")

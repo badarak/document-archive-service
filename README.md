@@ -106,6 +106,20 @@ placeholders: they let the application start, but no token can be obtained, so e
 outside the health endpoint answers `401`. Token validation is covered by the integration tests,
 which sign their own tokens.
 
+## Tests
+
+```bash
+./mvnw test      # unit tests only
+./mvnw verify    # unit and integration tests, code style and the 80 % coverage threshold
+```
+
+- **Unit tests** are named `*Test`. They use JUnit and MockK, and start no Spring context.
+- **Integration tests** are named `*IT` and live in the `infrastructure` module only. They start a
+  Spring context with the `test` profile: an in-memory H2 database in PostgreSQL mode and
+  placeholder storage settings. They need neither Docker nor the `.env` file.
+
+Nothing is tested automatically against a real PostgreSQL or MinIO.
+
 ## Troubleshooting
 
 - **The `archive` schema is missing**: the PostgreSQL init script only runs on an empty data volume.

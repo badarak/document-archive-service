@@ -14,3 +14,13 @@ spring:
     hibernate:
       # The schema is owned by Liquibase; Hibernate only checks that entities match it.
       ddl-auto: validate
+
+archive:
+  storage:
+    s3:
+      endpoint: ${ARCHIVE_S3_ENDPOINT}
+      region: ${ARCHIVE_S3_REGION}
+      bucket: ${ARCHIVE_S3_BUCKET}
+      access-key: ${ARCHIVE_S3_ACCESS_KEY}
+      secret-key: ${ARCHIVE_S3_SECRET_KEY}
+      path-style-access: ${ARCHIVE_S3_PATH_STYLE_ACCESS:true}

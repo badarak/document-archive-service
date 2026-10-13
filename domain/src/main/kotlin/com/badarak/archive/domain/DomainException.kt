@@ -8,3 +8,8 @@ class InvalidDocumentTypeException(val value: String) :
 
 class InvalidStatusTransitionException(val from: DocumentStatus, val to: DocumentStatus) :
     DomainException("A document cannot move from status $from to $to")
+
+class EmptyDocumentException(val sizeBytes: Long) : DomainException("A document must not be empty, got a size of $sizeBytes bytes")
+
+class DocumentTooLargeException(val sizeBytes: Long, val maxSizeBytes: Long) :
+    DomainException("A document of $sizeBytes bytes exceeds the maximum size of $maxSizeBytes bytes")

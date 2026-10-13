@@ -93,11 +93,12 @@ The service is an OAuth2 resource server: callers authenticate with a JWT access
 | Request | Requirement |
 |---|---|
 | `/actuator/health` and its probes | None, so monitoring can call them |
+| `/.well-known/oauth-protected-resource` | None; standard metadata published by Spring Security (the service URL and the bearer method) |
 | `GET /api/v1/documents/**` | Valid token with the `documents:read` scope |
 | Other methods on `/api/v1/documents/**` | Valid token with the `documents:write` scope |
-| Anything else | Denied |
+| Anything else | Denied, even with a valid token |
 
-The identity provider signs each token with its private key, which it never shares. It publishes
+The authorization server signs each token with its private key, which it never shares. It publishes
 the matching public keys at `ARCHIVE_JWT_JWKS_URI`; the service downloads them to verify the
 signature. A token is valid when:
 
@@ -108,10 +109,10 @@ signature. A token is valid when:
 
 A missing or invalid token gets `401`; a valid token without the required scope gets `403`.
 
-**No identity provider runs locally yet.** The `ARCHIVE_JWT_*` values in `.env.example` are
-placeholders: they let the application start, but no token can be obtained, so every request
-outside the health endpoint answers `401`. Token validation is covered by the integration tests,
-which sign their own tokens.
+**No authorization server runs locally yet.** The `ARCHIVE_JWT_*` values in `.env.example` are
+placeholders: they let the application start, but no token can be obtained, so the document API
+always answers `401`. Token validation is covered by the integration tests, which sign their own
+tokens.
 
 ## Tests
 

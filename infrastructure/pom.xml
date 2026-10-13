@@ -15,6 +15,9 @@
 
     <properties>
         <archive.framework-ban.skip>true</archive.framework-ban.skip>
+        <spring-boot.run.skip>false</spring-boot.run.skip>
+        <!-- spring-boot:run is a development command, so it reads the local .env file. -->
+        <spring-boot.run.profiles>local</spring-boot.run.profiles>
     </properties>
 
     <dependencies>

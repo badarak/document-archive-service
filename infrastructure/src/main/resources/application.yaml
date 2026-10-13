@@ -24,3 +24,15 @@ archive:
       access-key: ${ARCHIVE_S3_ACCESS_KEY}
       secret-key: ${ARCHIVE_S3_SECRET_KEY}
       path-style-access: ${ARCHIVE_S3_PATH_STYLE_ACCESS:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only the health endpoint is reachable over HTTP; it is what the monitoring probes call.
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true

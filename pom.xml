@@ -35,6 +35,8 @@
         <jacoco.minimum-line-coverage>0.80</jacoco.minimum-line-coverage>
         <!-- Modules are framework-free by default; only infrastructure disables the rule. -->
         <archive.framework-ban.skip>false</archive.framework-ban.skip>
+        <!-- "./mvnw spring-boot:run" from the root only starts the module holding the application. -->
+        <spring-boot.run.skip>true</spring-boot.run.skip>
     </properties>
 
     <dependencyManagement>

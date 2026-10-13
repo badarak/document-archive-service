@@ -41,33 +41,33 @@ class ApiSecurityIT {
     }
 
     @Test
-    fun `a token signed by a published key is accepted`() {
-        getDocuments(TestIdentityProvider.token(scope = READ)).andExpect { status { isOk() } }
+    fun `a token signed by the authorization server is accepted`() {
+        getDocuments(TestAuthorizationServer.token(scope = READ)).andExpect { status { isOk() } }
     }
 
     @Test
-    fun `a token signed by an unknown key is rejected with 401`() {
-        getDocuments(TestIdentityProvider.token(signedWithPublishedKey = false)).andExpect { status { isUnauthorized() } }
+    fun `a token signed with a key the server does not publish is rejected with 401`() {
+        getDocuments(TestAuthorizationServer.token(signedByServer = false)).andExpect { status { isUnauthorized() } }
     }
 
     @Test
     fun `a token from another issuer is rejected with 401`() {
-        getDocuments(TestIdentityProvider.token(issuer = "https://other-idp.test")).andExpect { status { isUnauthorized() } }
+        getDocuments(TestAuthorizationServer.token(issuer = "https://other-auth.test")).andExpect { status { isUnauthorized() } }
     }
 
     @Test
     fun `a token intended for another audience is rejected with 401`() {
-        getDocuments(TestIdentityProvider.token(audience = listOf("billing-service"))).andExpect { status { isUnauthorized() } }
+        getDocuments(TestAuthorizationServer.token(audience = listOf("billing-service"))).andExpect { status { isUnauthorized() } }
     }
 
     @Test
     fun `a token without audience is rejected with 401`() {
-        getDocuments(TestIdentityProvider.token(audience = emptyList())).andExpect { status { isUnauthorized() } }
+        getDocuments(TestAuthorizationServer.token(audience = emptyList())).andExpect { status { isUnauthorized() } }
     }
 
     @Test
     fun `an expired token is rejected with 401`() {
-        val expired = TestIdentityProvider.token(expiresAt = Instant.now().minusSeconds(300))
+        val expired = TestAuthorizationServer.token(expiresAt = Instant.now().minusSeconds(300))
 
         getDocuments(expired).andExpect { status { isUnauthorized() } }
     }
@@ -79,31 +79,31 @@ class ApiSecurityIT {
 
     @Test
     fun `a valid token without scope is rejected with 403`() {
-        getDocuments(TestIdentityProvider.token()).andExpect { status { isForbidden() } }
+        getDocuments(TestAuthorizationServer.token()).andExpect { status { isForbidden() } }
     }
 
     @Test
     fun `reading documents requires the read scope`() {
-        getDocuments(TestIdentityProvider.token(scope = WRITE)).andExpect { status { isForbidden() } }
-        getDocuments(TestIdentityProvider.token(scope = "profile $READ")).andExpect { status { isOk() } }
-        mockMvc.get("$DOCUMENTS/42") { bearer(TestIdentityProvider.token(scope = READ)) }.andExpect { status { isOk() } }
+        getDocuments(TestAuthorizationServer.token(scope = WRITE)).andExpect { status { isForbidden() } }
+        getDocuments(TestAuthorizationServer.token(scope = "profile $READ")).andExpect { status { isOk() } }
+        mockMvc.get("$DOCUMENTS/42") { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isOk() } }
     }
 
     @Test
     fun `archiving a document requires the write scope`() {
-        mockMvc.post(DOCUMENTS) { bearer(TestIdentityProvider.token(scope = READ)) }.andExpect { status { isForbidden() } }
-        mockMvc.post(DOCUMENTS) { bearer(TestIdentityProvider.token(scope = WRITE)) }.andExpect { status { isOk() } }
+        mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isForbidden() } }
+        mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isOk() } }
     }
 
     @Test
     fun `deleting a document requires the write scope`() {
-        mockMvc.delete("$DOCUMENTS/42") { bearer(TestIdentityProvider.token(scope = READ)) }.andExpect { status { isForbidden() } }
-        mockMvc.delete("$DOCUMENTS/42") { bearer(TestIdentityProvider.token(scope = WRITE)) }.andExpect { status { isOk() } }
+        mockMvc.delete("$DOCUMENTS/42") { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isForbidden() } }
+        mockMvc.delete("$DOCUMENTS/42") { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isOk() } }
     }
 
     @Test
     fun `a path outside the document API is closed even with every scope`() {
-        val token = TestIdentityProvider.token(scope = "$READ $WRITE")
+        val token = TestAuthorizationServer.token(scope = "$READ $WRITE")
 
         mockMvc.get("/api/v1/other") { bearer(token) }.andExpect { status { isForbidden() } }
         mockMvc.get("/actuator/env") { bearer(token) }.andExpect { status { isForbidden() } }
@@ -146,8 +146,8 @@ class ApiSecurityIT {
 
         @JvmStatic
         @DynamicPropertySource
-        fun identityProviderProperties(registry: DynamicPropertyRegistry) {
-            registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri") { TestIdentityProvider.jwksUri }
+        fun authorizationServerProperties(registry: DynamicPropertyRegistry) {
+            registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri") { TestAuthorizationServer.jwksUri }
         }
     }
 }

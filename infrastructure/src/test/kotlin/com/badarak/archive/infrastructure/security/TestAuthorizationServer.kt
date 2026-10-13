@@ -15,18 +15,19 @@ import java.time.Instant
 import java.util.Date
 
 /**
- * Stands in for the identity provider in integration tests: publishes a key set over HTTP and
- * signs access tokens. It lives as long as the test JVM, so every test shares the same key set URI.
+ * Stands in for the authorization server in integration tests: signs access tokens with its private
+ * key and publishes only the matching public key over HTTP. It lives as long as the test JVM, so
+ * every test shares the same key set URI.
  */
-object TestIdentityProvider {
-    const val ISSUER = "https://idp.test"
+object TestAuthorizationServer {
+    const val ISSUER = "https://auth.test"
     const val AUDIENCE = "document-archive-service"
 
-    private val publishedKey: RSAKey = generateKey()
-    private val unpublishedKey: RSAKey = generateKey()
+    private val signingKeyPair: RSAKey = generateKeyPair()
+    private val foreignKeyPair: RSAKey = generateKeyPair()
 
     private val server: HttpServer = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0).apply {
-        val keySet = JWKSet(publishedKey.toPublicJWK()).toString().toByteArray()
+        val keySet = JWKSet(signingKeyPair.toPublicJWK()).toString().toByteArray()
         createContext("/jwks") { exchange ->
             exchange.responseHeaders.add("Content-Type", "application/json")
             exchange.sendResponseHeaders(200, keySet.size.toLong())
@@ -42,9 +43,9 @@ object TestIdentityProvider {
         audience: List<String> = listOf(AUDIENCE),
         expiresAt: Instant = Instant.now().plusSeconds(300),
         scope: String? = null,
-        signedWithPublishedKey: Boolean = true,
+        signedByServer: Boolean = true,
     ): String {
-        val key = if (signedWithPublishedKey) publishedKey else unpublishedKey
+        val keyPair = if (signedByServer) signingKeyPair else foreignKeyPair
         val claims = JWTClaimsSet.Builder()
             .issuer(issuer)
             .subject("billing-service")
@@ -53,11 +54,11 @@ object TestIdentityProvider {
             .expirationTime(Date.from(expiresAt))
             .apply { scope?.let { claim("scope", it) } }
             .build()
-        return SignedJWT(JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.keyID).build(), claims)
-            .apply { sign(RSASSASigner(key)) }
+        return SignedJWT(JWSHeader.Builder(JWSAlgorithm.RS256).keyID(keyPair.keyID).build(), claims)
+            .apply { sign(RSASSASigner(keyPair)) }
             .serialize()
     }
 
-    // Both keys share the same identifier, so a forged token is rejected on its signature alone.
-    private fun generateKey(): RSAKey = RSAKeyGenerator(2048).keyID("test-key").generate()
+    // Both key pairs share the same identifier, so a forged token is rejected on its signature alone.
+    private fun generateKeyPair(): RSAKey = RSAKeyGenerator(2048).keyID("test-key").generate()
 }

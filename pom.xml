@@ -29,6 +29,7 @@
         <!-- The Kotlin version is driven by the Spring Boot BOM (kotlin.version). -->
         <java.version>21</java.version>
         <mockk.version>1.14.11</mockk.version>
+        <aws-sdk.version>2.55.15</aws-sdk.version>
         <ktlint-maven-plugin.version>3.7.1</ktlint-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <jacoco.minimum-line-coverage>0.80</jacoco.minimum-line-coverage>
@@ -57,6 +58,13 @@
                 <groupId>io.mockk</groupId>
                 <artifactId>mockk-jvm</artifactId>
                 <version>${mockk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

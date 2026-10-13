@@ -85,6 +85,27 @@ The file is looked up in the working directory and in its parent: start the appl
 project root or from the `infrastructure` module. From an IDE, activate the `local` profile and keep
 one of these two working directories.
 
+## Security
+
+The service is an OAuth2 resource server: callers authenticate with a JWT access token sent in the
+`Authorization: Bearer` header.
+
+| Request | Requirement |
+|---|---|
+| `/actuator/health` and its probes | None, so monitoring can call them |
+| `GET /api/v1/documents/**` | Valid token with the `documents:read` scope |
+| Other methods on `/api/v1/documents/**` | Valid token with the `documents:write` scope |
+| Anything else | Denied |
+
+A token is valid when it is signed by a key published at `ARCHIVE_JWT_JWKS_URI`, issued by
+`ARCHIVE_JWT_ISSUER`, intended for `ARCHIVE_JWT_AUDIENCE` and not expired. A missing or invalid
+token gets `401`; a valid token without the required scope gets `403`.
+
+**No identity provider runs locally yet.** The `ARCHIVE_JWT_*` values in `.env.example` are
+placeholders: they let the application start, but no token can be obtained, so every request
+outside the health endpoint answers `401`. Token validation is covered by the integration tests,
+which sign their own tokens.
+
 ## Troubleshooting
 
 - **The `archive` schema is missing**: the PostgreSQL init script only runs on an empty data volume.

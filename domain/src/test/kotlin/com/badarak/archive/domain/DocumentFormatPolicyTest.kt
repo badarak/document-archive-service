@@ -72,6 +72,12 @@ class DocumentFormatPolicyTest {
         assertEquals(DocumentFormat.EML, policy.check(FileName.of("message.eml"), "message/rfc822", "From: a@b.c".toByteArray()))
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["application/pdf", "Application/PDF", " application/pdf ; charset=binary"])
+    fun `normalises a content type to its media type`(contentType: String) {
+        assertEquals("application/pdf", policy.mediaType(contentType))
+    }
+
     @Test
     fun `builds the policy from configured extensions`() {
         val configured = DocumentFormatPolicy.ofExtensions(listOf("pdf", " DOCX "))

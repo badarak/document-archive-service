@@ -4,10 +4,10 @@ import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import org.springframework.dao.DataAccessException
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Repository
 
 /** Each call runs in its own transaction, the one Spring Data opens around save. */
-@Component
+@Repository
 class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocumentRepository) : DocumentRepository {
 
     override fun save(document: ArchivedDocument) {

@@ -1,12 +1,12 @@
 package com.badarak.archive.infrastructure.persistence
 
-import com.badarak.archive.application.port.DocumentPersistenceException
-import com.badarak.archive.domain.ArchivedDocument
-import com.badarak.archive.domain.DocumentId
-import com.badarak.archive.domain.DocumentSizePolicy
-import com.badarak.archive.domain.DocumentType
-import com.badarak.archive.domain.ObjectKey
-import com.badarak.archive.domain.TenantId
+import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentSizePolicy
+import com.badarak.archive.domain.model.DocumentType
+import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.TenantId
+import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals

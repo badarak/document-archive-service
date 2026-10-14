@@ -1,8 +1,8 @@
 package com.badarak.archive.infrastructure.storage
 
-import com.badarak.archive.application.port.ObjectStorageException
-import com.badarak.archive.application.port.ObjectStoragePort
-import com.badarak.archive.domain.ObjectKey
+import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.port.outbound.ObjectStorageException
+import com.badarak.archive.domain.port.outbound.ObjectStoragePort
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.core.exception.SdkException
 import software.amazon.awssdk.core.sync.RequestBody

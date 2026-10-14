@@ -46,7 +46,7 @@ Use hexagonal architecture.
 
 Dependency direction:
 
-domain <- application <- infrastructure
+domain <- infrastructure
 
 The domain must remain framework independent.
 

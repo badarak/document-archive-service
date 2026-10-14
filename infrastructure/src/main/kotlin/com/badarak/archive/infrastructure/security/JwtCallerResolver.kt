@@ -1,7 +1,7 @@
 package com.badarak.archive.infrastructure.security
 
-import com.badarak.archive.application.AuthenticatedCaller
-import com.badarak.archive.domain.TenantId
+import com.badarak.archive.domain.model.TenantId
+import com.badarak.archive.domain.port.inbound.AuthenticatedCaller
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Component

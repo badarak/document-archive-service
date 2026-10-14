@@ -1,7 +1,7 @@
 package com.badarak.archive.infrastructure.archiving
 
-import com.badarak.archive.application.ArchiveDocumentUseCase
-import com.badarak.archive.domain.DocumentSizePolicy
+import com.badarak.archive.domain.model.DocumentSizePolicy
+import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

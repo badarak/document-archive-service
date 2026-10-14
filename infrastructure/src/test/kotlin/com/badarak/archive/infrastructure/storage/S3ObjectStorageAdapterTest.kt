@@ -1,7 +1,7 @@
 package com.badarak.archive.infrastructure.storage
 
-import com.badarak.archive.application.port.ObjectStorageException
-import com.badarak.archive.domain.ObjectKey
+import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot

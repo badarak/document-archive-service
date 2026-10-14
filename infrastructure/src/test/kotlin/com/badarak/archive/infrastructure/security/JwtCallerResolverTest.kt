@@ -1,8 +1,8 @@
 package com.badarak.archive.infrastructure.security
 
-import com.badarak.archive.application.AuthenticatedCaller
-import com.badarak.archive.domain.InvalidTenantIdException
-import com.badarak.archive.domain.TenantId
+import com.badarak.archive.domain.model.InvalidTenantIdException
+import com.badarak.archive.domain.model.TenantId
+import com.badarak.archive.domain.port.inbound.AuthenticatedCaller
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test

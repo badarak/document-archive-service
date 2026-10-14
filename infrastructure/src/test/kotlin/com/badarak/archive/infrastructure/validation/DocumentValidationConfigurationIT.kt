@@ -1,7 +1,7 @@
 package com.badarak.archive.infrastructure.validation
 
-import com.badarak.archive.domain.DocumentFormat
-import com.badarak.archive.domain.DocumentFormatPolicy
+import com.badarak.archive.domain.model.DocumentFormat
+import com.badarak.archive.domain.model.DocumentFormatPolicy
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

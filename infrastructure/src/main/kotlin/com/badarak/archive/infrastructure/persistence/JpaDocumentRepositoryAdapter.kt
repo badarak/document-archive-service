@@ -1,8 +1,8 @@
 package com.badarak.archive.infrastructure.persistence
 
-import com.badarak.archive.application.port.DocumentPersistenceException
-import com.badarak.archive.application.port.DocumentRepositoryPort
-import com.badarak.archive.domain.ArchivedDocument
+import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
+import com.badarak.archive.domain.port.outbound.DocumentRepositoryPort
 import org.springframework.dao.DataAccessException
 import org.springframework.stereotype.Component
 

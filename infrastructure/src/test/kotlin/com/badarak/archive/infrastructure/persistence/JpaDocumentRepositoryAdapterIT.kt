@@ -1,11 +1,11 @@
 package com.badarak.archive.infrastructure.persistence
 
-import com.badarak.archive.domain.ArchivedDocument
-import com.badarak.archive.domain.DocumentId
-import com.badarak.archive.domain.DocumentSizePolicy
-import com.badarak.archive.domain.DocumentType
-import com.badarak.archive.domain.ObjectKey
-import com.badarak.archive.domain.TenantId
+import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentSizePolicy
+import com.badarak.archive.domain.model.DocumentType
+import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.TenantId
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test

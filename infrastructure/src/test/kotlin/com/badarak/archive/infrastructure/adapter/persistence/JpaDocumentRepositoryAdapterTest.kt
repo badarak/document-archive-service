@@ -1,4 +1,4 @@
-package com.badarak.archive.infrastructure.persistence
+package com.badarak.archive.infrastructure.adapter.persistence
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId

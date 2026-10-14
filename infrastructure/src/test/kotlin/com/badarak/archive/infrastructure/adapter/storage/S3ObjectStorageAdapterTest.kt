@@ -1,4 +1,4 @@
-package com.badarak.archive.infrastructure.storage
+package com.badarak.archive.infrastructure.adapter.storage
 
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.port.outbound.ObjectStorageException

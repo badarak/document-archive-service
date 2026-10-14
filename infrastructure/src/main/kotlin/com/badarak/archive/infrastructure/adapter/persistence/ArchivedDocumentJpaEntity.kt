@@ -1,4 +1,4 @@
-package com.badarak.archive.infrastructure.persistence
+package com.badarak.archive.infrastructure.adapter.persistence
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

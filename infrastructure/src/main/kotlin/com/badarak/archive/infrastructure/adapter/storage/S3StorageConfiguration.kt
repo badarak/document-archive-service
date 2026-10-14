@@ -1,4 +1,4 @@
-package com.badarak.archive.infrastructure.storage
+package com.badarak.archive.infrastructure.adapter.storage
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean

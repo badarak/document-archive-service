@@ -1,4 +1,4 @@
-package com.badarak.archive.infrastructure.storage
+package com.badarak.archive.infrastructure.adapter.storage
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test

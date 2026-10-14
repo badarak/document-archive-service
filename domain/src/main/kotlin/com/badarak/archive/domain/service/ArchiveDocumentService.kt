@@ -11,9 +11,9 @@ import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
-import com.badarak.archive.domain.port.outbound.DocumentRepositoryPort
+import com.badarak.archive.domain.port.outbound.DocumentRepository
+import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
-import com.badarak.archive.domain.port.outbound.ObjectStoragePort
 import java.io.InputStream
 import java.time.Clock
 
@@ -27,8 +27,8 @@ import java.time.Clock
  * without its content.
  */
 class ArchiveDocumentService(
-    private val documents: DocumentRepositoryPort,
-    private val storage: ObjectStoragePort,
+    private val documents: DocumentRepository,
+    private val storage: ObjectStorage,
     private val formatPolicy: DocumentFormatPolicy,
     private val sizePolicy: DocumentSizePolicy,
     private val clock: Clock,

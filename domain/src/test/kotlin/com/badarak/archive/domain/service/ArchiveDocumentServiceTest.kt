@@ -13,9 +13,9 @@ import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.AuthenticatedCaller
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
-import com.badarak.archive.domain.port.outbound.DocumentRepositoryPort
+import com.badarak.archive.domain.port.outbound.DocumentRepository
+import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
-import com.badarak.archive.domain.port.outbound.ObjectStoragePort
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
@@ -39,8 +39,8 @@ class ArchiveDocumentServiceTest {
     private val now = Instant.parse("2026-10-14T09:15:00Z")
     private val content = "%PDF-1.7\n%âãÏÓ\n1 0 obj".toByteArray()
 
-    private val documents = mockk<DocumentRepositoryPort>()
-    private val storage = mockk<ObjectStoragePort>()
+    private val documents = mockk<DocumentRepository>()
+    private val storage = mockk<ObjectStorage>()
     private val service = ArchiveDocumentService(
         documents = documents,
         storage = storage,

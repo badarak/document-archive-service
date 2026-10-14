@@ -3,7 +3,7 @@ package com.badarak.archive.domain.port.outbound
 import com.badarak.archive.domain.model.ArchivedDocument
 
 /** Stores the metadata and archiving state of documents. */
-interface DocumentRepositoryPort {
+interface DocumentRepository {
 
     /**
      * Inserts [document], or replaces the stored state of the document with the same identifier.

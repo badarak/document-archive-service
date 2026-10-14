@@ -4,7 +4,7 @@ import com.badarak.archive.domain.model.ObjectKey
 import java.io.InputStream
 
 /** Stores the binary content of documents, whatever the object storage provider. */
-interface ObjectStoragePort {
+interface ObjectStorage {
 
     /**
      * Stores the [sizeBytes] bytes of [content] under [key], read as a stream.

@@ -1,8 +1,8 @@
 package com.badarak.archive.infrastructure.storage
 
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
-import com.badarak.archive.domain.port.outbound.ObjectStoragePort
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.core.exception.SdkException
 import software.amazon.awssdk.core.sync.RequestBody
@@ -12,7 +12,7 @@ import java.io.InputStream
 
 /** Uploads each document in a single PutObject request: documents are small enough to need no multipart upload. */
 @Component
-class S3ObjectStorageAdapter(private val s3Client: S3Client, private val properties: S3StorageProperties) : ObjectStoragePort {
+class S3ObjectStorageAdapter(private val s3Client: S3Client, private val properties: S3StorageProperties) : ObjectStorage {
 
     override fun store(key: ObjectKey, content: InputStream, sizeBytes: Long, contentType: String) {
         val request = PutObjectRequest.builder()

@@ -2,13 +2,13 @@ package com.badarak.archive.infrastructure.persistence
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
-import com.badarak.archive.domain.port.outbound.DocumentRepositoryPort
+import com.badarak.archive.domain.port.outbound.DocumentRepository
 import org.springframework.dao.DataAccessException
 import org.springframework.stereotype.Component
 
 /** Each call runs in its own transaction, the one Spring Data opens around save. */
 @Component
-class JpaDocumentRepositoryAdapter(private val repository: ArchivedDocumentJpaRepository) : DocumentRepositoryPort {
+class JpaDocumentRepositoryAdapter(private val repository: ArchivedDocumentJpaRepository) : DocumentRepository {
 
     override fun save(document: ArchivedDocument) {
         try {

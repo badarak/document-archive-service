@@ -22,7 +22,7 @@ class ArchivedDocument(
     val fileName: String,
     val contentType: String,
     val sizeBytes: Long,
-    val objectKey: String,
+    val objectKey: ObjectKey,
     val status: DocumentStatus,
     val createdAt: Instant,
     val updatedAt: Instant,
@@ -35,7 +35,6 @@ class ArchivedDocument(
         description?.let { requireMaxLength("description", it, DESCRIPTION_MAX_LENGTH) }
         requireText("fileName", fileName, FILE_NAME_MAX_LENGTH)
         requireText("contentType", contentType, CONTENT_TYPE_MAX_LENGTH)
-        requireText("objectKey", objectKey, OBJECT_KEY_MAX_LENGTH)
         if (sizeBytes <= 0) throw EmptyDocumentException(sizeBytes)
         if (updatedAt.isBefore(createdAt)) throw InvalidDocumentException("updatedAt", "must not be before createdAt")
     }
@@ -76,7 +75,6 @@ class ArchivedDocument(
         const val DESCRIPTION_MAX_LENGTH = 1000
         const val FILE_NAME_MAX_LENGTH = 255
         const val CONTENT_TYPE_MAX_LENGTH = 255
-        const val OBJECT_KEY_MAX_LENGTH = 512
 
         fun create(
             id: DocumentId,
@@ -89,7 +87,7 @@ class ArchivedDocument(
             fileName: String,
             contentType: String,
             sizeBytes: Long,
-            objectKey: String,
+            objectKey: ObjectKey,
             sizePolicy: DocumentSizePolicy,
             now: Instant,
         ): ArchivedDocument {

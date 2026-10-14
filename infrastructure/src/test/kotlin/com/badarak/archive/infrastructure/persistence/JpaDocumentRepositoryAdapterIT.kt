@@ -4,6 +4,7 @@ import com.badarak.archive.domain.ArchivedDocument
 import com.badarak.archive.domain.DocumentId
 import com.badarak.archive.domain.DocumentSizePolicy
 import com.badarak.archive.domain.DocumentType
+import com.badarak.archive.domain.ObjectKey
 import com.badarak.archive.domain.TenantId
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -47,7 +48,7 @@ class JpaDocumentRepositoryAdapterIT {
         assertEquals("invoice-123.pdf", stored.fileName)
         assertEquals("application/pdf", stored.contentType)
         assertEquals(248_120, stored.sizeBytes)
-        assertEquals("documents/${document.id}", stored.objectKey)
+        assertEquals(document.objectKey.value, stored.objectKey)
         assertEquals("PENDING", stored.status)
         assertEquals(createdAt, stored.createdAt)
         assertEquals(createdAt, stored.updatedAt)
@@ -80,7 +81,7 @@ class JpaDocumentRepositoryAdapterIT {
             fileName = "invoice-123.pdf",
             contentType = "application/pdf",
             sizeBytes = 248_120,
-            objectKey = "documents/$id",
+            objectKey = ObjectKey.generate(),
             sizePolicy = DocumentSizePolicy(),
             now = createdAt,
         )

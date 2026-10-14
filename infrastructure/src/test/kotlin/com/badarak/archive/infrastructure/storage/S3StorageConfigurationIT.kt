@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import software.amazon.awssdk.services.s3.S3Client
 import java.net.URI
+import java.time.Duration
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -23,5 +24,6 @@ class S3StorageConfigurationIT {
         assertEquals("test-bucket", properties.bucket)
         assertEquals(URI.create("http://localhost:9000"), properties.endpoint)
         assertEquals(properties.endpoint, s3Client.serviceClientConfiguration().endpointOverride().orElseThrow())
+        assertEquals(Duration.ofMinutes(2), s3Client.serviceClientConfiguration().overrideConfiguration().apiCallTimeout().orElseThrow())
     }
 }

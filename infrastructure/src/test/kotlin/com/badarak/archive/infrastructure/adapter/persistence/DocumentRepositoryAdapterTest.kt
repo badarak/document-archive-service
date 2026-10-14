@@ -16,10 +16,10 @@ import org.junit.jupiter.api.Test
 import org.springframework.dao.DataAccessResourceFailureException
 import java.time.Instant
 
-class JpaDocumentRepositoryAdapterTest {
+class DocumentRepositoryAdapterTest {
 
-    private val repository = mockk<ArchivedDocumentJpaRepository>()
-    private val adapter = JpaDocumentRepositoryAdapter(repository)
+    private val repository = mockk<SpringDataArchivedDocumentRepository>()
+    private val adapter = DocumentRepositoryAdapter(repository)
 
     @Test
     fun `a database failure becomes a document persistence error`() {

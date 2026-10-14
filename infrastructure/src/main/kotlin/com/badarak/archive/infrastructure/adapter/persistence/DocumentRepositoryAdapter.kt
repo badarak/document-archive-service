@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
 
 /** Each call runs in its own transaction, the one Spring Data opens around save. */
 @Component
-class JpaDocumentRepositoryAdapter(private val repository: ArchivedDocumentJpaRepository) : DocumentRepository {
+class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocumentRepository) : DocumentRepository {
 
     override fun save(document: ArchivedDocument) {
         try {

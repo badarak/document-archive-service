@@ -18,10 +18,10 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse
 import software.amazon.awssdk.services.s3.model.S3Exception
 import java.net.URI
 
-class S3ObjectStorageAdapterTest {
+class ObjectStorageAdapterTest {
 
     private val s3Client = mockk<S3Client>()
-    private val adapter = S3ObjectStorageAdapter(s3Client, properties())
+    private val adapter = ObjectStorageAdapter(s3Client, properties())
 
     private val key = ObjectKey("documents/7d7d57e1")
     private val content = "%PDF-1.7 content".toByteArray()

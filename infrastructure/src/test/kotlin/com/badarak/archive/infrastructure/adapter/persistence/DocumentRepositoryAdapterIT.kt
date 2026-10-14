@@ -16,13 +16,13 @@ import java.time.Instant
 
 @SpringBootTest
 @ActiveProfiles("test")
-class JpaDocumentRepositoryAdapterIT {
+class DocumentRepositoryAdapterIT {
 
     @Autowired
-    private lateinit var adapter: JpaDocumentRepositoryAdapter
+    private lateinit var adapter: DocumentRepositoryAdapter
 
     @Autowired
-    private lateinit var repository: ArchivedDocumentJpaRepository
+    private lateinit var repository: SpringDataArchivedDocumentRepository
 
     private val createdAt = Instant.parse("2026-10-14T09:15:00.123456Z")
     private val later = Instant.parse("2026-10-14T09:15:05.654321Z")

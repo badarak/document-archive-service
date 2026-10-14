@@ -12,7 +12,7 @@ import java.io.InputStream
 
 /** Uploads each document in a single PutObject request: documents are small enough to need no multipart upload. */
 @Component
-class S3ObjectStorageAdapter(private val s3Client: S3Client, private val properties: S3StorageProperties) : ObjectStorage {
+class ObjectStorageAdapter(private val s3Client: S3Client, private val properties: S3StorageProperties) : ObjectStorage {
 
     override fun store(key: ObjectKey, content: InputStream, sizeBytes: Long, contentType: String) {
         val request = PutObjectRequest.builder()

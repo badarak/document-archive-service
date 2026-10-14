@@ -26,6 +26,7 @@ class ArchivedDocumentTest {
             val document = newDocument(id = id)
 
             assertEquals(id, document.id)
+            assertEquals(TenantId("acme"), document.tenantId)
             assertEquals(DocumentType("INVOICE"), document.documentType)
             assertEquals("BILLING-SERVICE", document.source)
             assertEquals("INV-2026-000123", document.businessReference)
@@ -140,6 +141,7 @@ class ArchivedDocumentTest {
             assertEquals(later, available.updatedAt)
             assertEquals(createdAt, available.createdAt)
             assertEquals(pending.id, available.id)
+            assertEquals(pending.tenantId, available.tenantId)
             assertEquals(pending.objectKey, available.objectKey)
         }
 
@@ -215,6 +217,7 @@ class ArchivedDocumentTest {
         sizePolicy: DocumentSizePolicy = DocumentSizePolicy(),
     ): ArchivedDocument = ArchivedDocument.create(
         id = id,
+        tenantId = TenantId("acme"),
         documentType = DocumentType("INVOICE"),
         source = source,
         businessReference = businessReference,
@@ -231,6 +234,7 @@ class ArchivedDocumentTest {
     private fun existingDocument(status: DocumentStatus, sizeBytes: Long = 248_120, updatedAt: Instant = createdAt): ArchivedDocument =
         ArchivedDocument(
             id = DocumentId.generate(),
+            tenantId = TenantId("acme"),
             documentType = DocumentType("INVOICE"),
             source = "BILLING-SERVICE",
             businessReference = null,

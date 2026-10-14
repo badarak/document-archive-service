@@ -26,6 +26,10 @@ spring:
           audiences: ${ARCHIVE_JWT_AUDIENCE}
 
 archive:
+  security:
+    claims:
+      tenant: ${ARCHIVE_JWT_TENANT_CLAIM:tenant_id}
+      source: ${ARCHIVE_JWT_SOURCE_CLAIM:azp}
   documents:
     allowed-extensions: ${ARCHIVE_ALLOWED_EXTENSIONS:pdf,doc,docx,mp3,wav,m4a,eml}
   storage:

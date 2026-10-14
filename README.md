@@ -55,8 +55,8 @@ It answers `{"groups":["liveness","readiness"],"status":"UP"}`.
 
 ## Environment variables
 
-The application has no default for these settings, except `ARCHIVE_ALLOWED_EXTENSIONS`: it does
-not start if one is missing.
+The application has no default for these settings, except the optional ones: it does not start if
+one is missing.
 `.env.example` is the reference list, with a comment on each variable.
 
 | Variables | Purpose |
@@ -68,6 +68,7 @@ not start if one is missing.
 | `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_JWT_ISSUER`, `ARCHIVE_JWT_JWKS_URI`, `ARCHIVE_JWT_AUDIENCE` | Access token validation, see [Security](#security) |
+| `ARCHIVE_JWT_TENANT_CLAIM`, `ARCHIVE_JWT_SOURCE_CLAIM` | Optional. Token claims naming the caller's tenant and the calling service (`tenant_id` and `azp` by default) |
 | `ARCHIVE_ALLOWED_EXTENSIONS` | Optional. Formats callers may archive, among `pdf`, `doc`, `docx`, `mp3`, `wav`, `m4a` and `eml` (all by default). An unknown extension stops the application at startup |
 
 ## The `local` profile
@@ -103,6 +104,10 @@ signature. A token is valid when:
 - it has not expired.
 
 A missing or invalid token gets `401`; a valid token without the required scope gets `403`.
+
+Each archived document records the tenant and the source of its caller, read from two token claims:
+`tenant_id` for the tenant and `azp` (the OAuth2 client the token was issued to) for the source. The
+authorization server must add the tenant claim, which is not standard.
 
 **No authorization server runs locally yet.** The `ARCHIVE_JWT_*` values in `.env.example` are
 placeholders: they let the application start, but no token can be obtained, so the document API

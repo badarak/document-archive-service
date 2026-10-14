@@ -1,7 +1,10 @@
 package com.badarak.archive.infrastructure.adapter.persistence
 
 import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.model.DocumentContent
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentMetadata
+import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
@@ -35,16 +38,9 @@ class DocumentRepositoryAdapterTest {
 
     private fun document(): ArchivedDocument = ArchivedDocument.create(
         id = DocumentId.generate(),
-        tenantId = TenantId("acme"),
-        documentType = DocumentType("INVOICE"),
-        source = "billing-service",
-        businessReference = null,
-        description = null,
-        tags = emptyMap(),
-        fileName = "invoice.pdf",
-        contentType = "application/pdf",
-        sizeBytes = 1,
-        objectKey = ObjectKey.generate(),
+        owner = DocumentOwner(TenantId("acme"), "billing-service"),
+        metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
+        content = DocumentContent("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
         sizePolicy = DocumentSizePolicy(),
         now = Instant.parse("2026-10-14T09:15:00Z"),
     )

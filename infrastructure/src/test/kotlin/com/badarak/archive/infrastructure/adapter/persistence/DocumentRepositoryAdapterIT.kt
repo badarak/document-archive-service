@@ -1,7 +1,10 @@
 package com.badarak.archive.infrastructure.adapter.persistence
 
 import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.model.DocumentContent
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentMetadata
+import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
@@ -48,7 +51,7 @@ class DocumentRepositoryAdapterIT {
         assertEquals("invoice-123.pdf", stored.fileName)
         assertEquals("application/pdf", stored.contentType)
         assertEquals(248_120, stored.sizeBytes)
-        assertEquals(document.objectKey.value, stored.objectKey)
+        assertEquals(document.content.objectKey.value, stored.objectKey)
         assertEquals("PENDING", stored.status)
         assertEquals(createdAt, stored.createdAt)
         assertEquals(createdAt, stored.updatedAt)
@@ -68,22 +71,12 @@ class DocumentRepositoryAdapterIT {
         assertEquals(later, stored.updatedAt)
     }
 
-    private fun pendingDocument(): ArchivedDocument {
-        val id = DocumentId.generate()
-        return ArchivedDocument.create(
-            id = id,
-            tenantId = TenantId("acme"),
-            documentType = DocumentType("INVOICE"),
-            source = "BILLING-SERVICE",
-            businessReference = "INV-2026-000123",
-            description = "Customer invoice",
-            tags = mapOf("customerId" to "CUST-456"),
-            fileName = "invoice-123.pdf",
-            contentType = "application/pdf",
-            sizeBytes = 248_120,
-            objectKey = ObjectKey.generate(),
-            sizePolicy = DocumentSizePolicy(),
-            now = createdAt,
-        )
-    }
+    private fun pendingDocument(): ArchivedDocument = ArchivedDocument.create(
+        id = DocumentId.generate(),
+        owner = DocumentOwner(TenantId("acme"), "BILLING-SERVICE"),
+        metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
+        content = DocumentContent("invoice-123.pdf", "application/pdf", 248_120, ObjectKey.generate()),
+        sizePolicy = DocumentSizePolicy(),
+        now = createdAt,
+    )
 }

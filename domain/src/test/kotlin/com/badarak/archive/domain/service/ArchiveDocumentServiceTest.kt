@@ -69,21 +69,21 @@ class ArchiveDocumentServiceTest {
             assertEquals(DocumentStatus.AVAILABLE, document.status)
             assertSame(saved.last(), document)
             assertArrayEquals(content, uploaded)
-            verify { storage.store(document.objectKey, any(), content.size.toLong(), "application/pdf") }
+            verify { storage.store(document.content.objectKey, any(), content.size.toLong(), "application/pdf") }
         }
 
         @Test
         fun `the document carries the caller, the metadata and a generated object key`() {
             val document = service.archive(command())
 
-            assertEquals(TenantId("acme"), document.tenantId)
-            assertEquals("billing-service", document.source)
-            assertEquals(DocumentType("INVOICE"), document.documentType)
-            assertEquals("INV-2026-000123", document.businessReference)
-            assertEquals("Customer invoice", document.description)
-            assertEquals(mapOf("customerId" to "CUST-456"), document.tags)
-            assertEquals(content.size.toLong(), document.sizeBytes)
-            assertTrue(document.objectKey.value.startsWith(ObjectKey.PREFIX))
+            assertEquals(TenantId("acme"), document.owner.tenantId)
+            assertEquals("billing-service", document.owner.source)
+            assertEquals(DocumentType("INVOICE"), document.metadata.documentType)
+            assertEquals("INV-2026-000123", document.metadata.businessReference)
+            assertEquals("Customer invoice", document.metadata.description)
+            assertEquals(mapOf("customerId" to "CUST-456"), document.metadata.tags)
+            assertEquals(content.size.toLong(), document.content.sizeBytes)
+            assertTrue(document.content.objectKey.value.startsWith(ObjectKey.PREFIX))
             assertEquals(now, document.createdAt)
             assertEquals(now, document.updatedAt)
         }
@@ -92,8 +92,8 @@ class ArchiveDocumentServiceTest {
         fun `stores the normalised file name and media type`() {
             val document = service.archive(command(fileName = "C:\\docs\\invoice.pdf", contentType = "Application/PDF; charset=binary"))
 
-            assertEquals("invoice.pdf", document.fileName)
-            assertEquals("application/pdf", document.contentType)
+            assertEquals("invoice.pdf", document.content.fileName)
+            assertEquals("application/pdf", document.content.contentType)
         }
     }
 

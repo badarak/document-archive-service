@@ -12,14 +12,14 @@ class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocume
 
     override fun save(document: ArchivedDocument) {
         try {
-            repository.save(document.toJpaEntity())
+            repository.save(document.toEntity())
         } catch (e: DataAccessException) {
             throw DocumentPersistenceException("Could not save document ${document.id}", e)
         }
     }
 }
 
-private fun ArchivedDocument.toJpaEntity(): ArchivedDocumentJpaEntity = ArchivedDocumentJpaEntity(
+private fun ArchivedDocument.toEntity(): ArchivedDocumentEntity = ArchivedDocumentEntity(
     id = id.value,
     tenantId = tenantId.value,
     documentType = documentType.value,

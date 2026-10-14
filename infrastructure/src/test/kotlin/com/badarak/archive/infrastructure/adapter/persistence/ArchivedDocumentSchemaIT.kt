@@ -73,7 +73,7 @@ class ArchivedDocumentSchemaIT {
     @Test
     fun `an archived document round-trips through the JPA mapping`() {
         val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
-        val document = ArchivedDocumentJpaEntity(
+        val document = ArchivedDocumentEntity(
             id = UUID.randomUUID(),
             tenantId = "acme",
             documentType = "INVOICE",
@@ -94,7 +94,7 @@ class ArchivedDocumentSchemaIT {
         entityManager.flush()
         entityManager.clear()
 
-        val reloaded = entityManager.find(ArchivedDocumentJpaEntity::class.java, document.id)
+        val reloaded = entityManager.find(ArchivedDocumentEntity::class.java, document.id)
         assertNotNull(reloaded)
         assertEquals(document.tenantId, reloaded.tenantId)
         assertEquals(document.documentType, reloaded.documentType)

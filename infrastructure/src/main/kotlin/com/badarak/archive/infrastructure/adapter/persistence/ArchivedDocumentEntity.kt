@@ -11,7 +11,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "archived_document", schema = "archive")
-class ArchivedDocumentJpaEntity(
+class ArchivedDocumentEntity(
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     val id: UUID,

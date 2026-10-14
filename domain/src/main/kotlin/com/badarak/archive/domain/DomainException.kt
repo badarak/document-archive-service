@@ -15,3 +15,14 @@ class EmptyDocumentException(val sizeBytes: Long) : DomainException("A document 
 
 class DocumentTooLargeException(val sizeBytes: Long, val maxSizeBytes: Long) :
     DomainException("A document of $sizeBytes bytes exceeds the maximum size of $maxSizeBytes bytes")
+
+class UnsupportedDocumentFormatException(val fileName: String, val allowedExtensions: List<String>) :
+    DomainException("The format of '$fileName' is not supported: allowed extensions are ${allowedExtensions.joinToString()}")
+
+class ContentTypeMismatchException(val declaredContentType: String, val format: DocumentFormat) :
+    DomainException(
+        "Content type '$declaredContentType' does not match a .${format.extension} file: " +
+            "expected ${format.contentTypes.joinToString(" or ")}",
+    )
+
+class ContentMismatchException(val format: DocumentFormat) : DomainException("The content does not match a .${format.extension} file")

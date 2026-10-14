@@ -55,7 +55,8 @@ It answers `{"groups":["liveness","readiness"],"status":"UP"}`.
 
 ## Environment variables
 
-The application has no default for these settings: it does not start if one is missing.
+The application has no default for these settings, except `ARCHIVE_ALLOWED_EXTENSIONS`: it does
+not start if one is missing.
 `.env.example` is the reference list, with a comment on each variable.
 
 | Variables | Purpose |
@@ -67,6 +68,7 @@ The application has no default for these settings: it does not start if one is m
 | `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_JWT_ISSUER`, `ARCHIVE_JWT_JWKS_URI`, `ARCHIVE_JWT_AUDIENCE` | Access token validation, see [Security](#security) |
+| `ARCHIVE_ALLOWED_EXTENSIONS` | Optional. Formats callers may archive, among `pdf`, `doc`, `docx`, `mp3`, `wav`, `m4a` and `eml` (all by default). An unknown extension stops the application at startup |
 
 ## The `local` profile
 

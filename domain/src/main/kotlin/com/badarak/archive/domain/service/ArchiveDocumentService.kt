@@ -5,10 +5,8 @@ import com.badarak.archive.domain.model.DocumentContent
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
-import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.FileName
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
@@ -38,15 +36,16 @@ class ArchiveDocumentService(
 ) : ArchiveDocumentUseCase {
 
     override fun archive(command: ArchiveDocumentCommand): ArchivedDocument {
-        val stream = command.content.buffered()
-        val fileName = FileName.of(command.fileName)
-        sizePolicy.check(command.sizeBytes)
-        formatPolicy.check(fileName, command.contentType, readHeader(stream))
+        val file = command.file
+        val stream = file.content.buffered()
+        val fileName = FileName.of(file.fileName)
+        sizePolicy.check(file.sizeBytes)
+        formatPolicy.check(fileName, file.contentType, readHeader(stream))
         val pending = ArchivedDocument.create(
             id = DocumentId.generate(),
             owner = DocumentOwner(command.caller.tenantId, command.caller.source),
-            metadata = DocumentMetadata(DocumentType(command.documentType), command.businessReference, command.description, command.tags),
-            content = DocumentContent(fileName.value, formatPolicy.mediaType(command.contentType), command.sizeBytes, ObjectKey.generate()),
+            metadata = command.metadata,
+            content = DocumentContent(fileName.value, formatPolicy.mediaType(file.contentType), file.sizeBytes, ObjectKey.generate()),
             sizePolicy = sizePolicy,
             now = clock.instant(),
         )

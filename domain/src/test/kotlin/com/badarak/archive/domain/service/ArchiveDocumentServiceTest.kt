@@ -2,16 +2,17 @@ package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentFormatPolicy
+import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.EmptyDocumentException
-import com.badarak.archive.domain.model.InvalidDocumentTypeException
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.AuthenticatedCaller
+import com.badarak.archive.domain.port.inbound.UploadedFile
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
@@ -114,13 +115,6 @@ class ArchiveDocumentServiceTest {
             assertNothingWritten()
         }
 
-        @Test
-        fun `an invalid document type leaves no trace`() {
-            assertThrows(InvalidDocumentTypeException::class.java) { service.archive(command(documentType = "invoice")) }
-
-            assertNothingWritten()
-        }
-
         private fun assertNothingWritten() {
             verify(exactly = 0) { documents.save(any()) }
             verify(exactly = 0) { storage.store(any(), any(), any(), any()) }
@@ -188,20 +182,10 @@ class ArchiveDocumentServiceTest {
         }
     }
 
-    private fun command(
-        documentType: String = "INVOICE",
-        fileName: String = "invoice-123.pdf",
-        contentType: String = "application/pdf",
-        content: ByteArray = this.content,
-    ) = ArchiveDocumentCommand(
-        caller = AuthenticatedCaller(TenantId("acme"), "billing-service"),
-        documentType = documentType,
-        businessReference = "INV-2026-000123",
-        description = "Customer invoice",
-        tags = mapOf("customerId" to "CUST-456"),
-        fileName = fileName,
-        contentType = contentType,
-        sizeBytes = content.size.toLong(),
-        content = content.inputStream(),
-    )
+    private fun command(fileName: String = "invoice-123.pdf", contentType: String = "application/pdf", content: ByteArray = this.content) =
+        ArchiveDocumentCommand(
+            caller = AuthenticatedCaller(TenantId("acme"), "billing-service"),
+            metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
+            file = UploadedFile(fileName, contentType, content.size.toLong(), content.inputStream()),
+        )
 }

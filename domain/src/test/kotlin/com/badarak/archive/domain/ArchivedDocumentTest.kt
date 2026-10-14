@@ -35,7 +35,7 @@ class ArchivedDocumentTest {
             assertEquals("invoice-123.pdf", document.fileName)
             assertEquals("application/pdf", document.contentType)
             assertEquals(248_120, document.sizeBytes)
-            assertEquals("documents/7d7d57e1", document.objectKey)
+            assertEquals(ObjectKey("documents/7d7d57e1"), document.objectKey)
             assertEquals(DocumentStatus.PENDING, document.status)
             assertEquals(createdAt, document.createdAt)
             assertEquals(createdAt, document.updatedAt)
@@ -81,7 +81,6 @@ class ArchivedDocumentTest {
             assertInvalid("source") { newDocument(source = " ") }
             assertInvalid("fileName") { newDocument(fileName = "") }
             assertInvalid("contentType") { newDocument(contentType = " ") }
-            assertInvalid("objectKey") { newDocument(objectKey = "") }
         }
 
         @Test
@@ -98,7 +97,6 @@ class ArchivedDocumentTest {
             assertInvalid("description") { newDocument(description = "x".repeat(ArchivedDocument.DESCRIPTION_MAX_LENGTH + 1)) }
             assertInvalid("fileName") { newDocument(fileName = "x".repeat(ArchivedDocument.FILE_NAME_MAX_LENGTH + 1)) }
             assertInvalid("contentType") { newDocument(contentType = "x".repeat(ArchivedDocument.CONTENT_TYPE_MAX_LENGTH + 1)) }
-            assertInvalid("objectKey") { newDocument(objectKey = "x".repeat(ArchivedDocument.OBJECT_KEY_MAX_LENGTH + 1)) }
         }
 
         @Test
@@ -213,7 +211,7 @@ class ArchivedDocumentTest {
         fileName: String = "invoice-123.pdf",
         contentType: String = "application/pdf",
         sizeBytes: Long = 248_120,
-        objectKey: String = "documents/7d7d57e1",
+        objectKey: ObjectKey = ObjectKey("documents/7d7d57e1"),
         sizePolicy: DocumentSizePolicy = DocumentSizePolicy(),
     ): ArchivedDocument = ArchivedDocument.create(
         id = id,
@@ -243,7 +241,7 @@ class ArchivedDocumentTest {
             fileName = "invoice-123.pdf",
             contentType = "application/pdf",
             sizeBytes = sizeBytes,
-            objectKey = "documents/7d7d57e1",
+            objectKey = ObjectKey("documents/7d7d57e1"),
             status = status,
             createdAt = createdAt,
             updatedAt = updatedAt,

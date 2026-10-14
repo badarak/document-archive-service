@@ -21,7 +21,8 @@ class DocumentFormatPolicy(allowedFormats: Set<DocumentFormat> = DocumentFormat.
         return format
     }
 
-    private fun mediaType(contentType: String): String = contentType.substringBefore(';').trim().lowercase()
+    /** The media type of [contentType], lowercase and without parameters: `Application/PDF; x=y` gives `application/pdf`. */
+    fun mediaType(contentType: String): String = contentType.substringBefore(';').trim().lowercase()
 
     companion object {
         /** Builds the policy from configured extensions; an extension the service does not know is a configuration error. */

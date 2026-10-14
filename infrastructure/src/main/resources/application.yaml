@@ -26,6 +26,8 @@ spring:
           audiences: ${ARCHIVE_JWT_AUDIENCE}
 
 archive:
+  documents:
+    allowed-extensions: ${ARCHIVE_ALLOWED_EXTENSIONS:pdf,doc,docx,mp3,wav,m4a,eml}
   storage:
     s3:
       endpoint: ${ARCHIVE_S3_ENDPOINT}

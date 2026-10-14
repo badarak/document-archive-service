@@ -1,4 +1,4 @@
-package com.badarak.archive.infrastructure.archiving
+package com.badarak.archive.infrastructure.config
 
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentSizePolicy
@@ -6,12 +6,14 @@ import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.service.ArchiveDocumentService
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
 
-/** Builds the archiving service, which stays free of Spring, from the adapters and policies. */
+/** Builds the archiving service, which stays free of Spring, from the adapters, its policies and a clock. */
 @Configuration
+@EnableConfigurationProperties(ArchivingProperties::class)
 class ArchivingConfiguration {
 
     @Bean
@@ -19,6 +21,10 @@ class ArchivingConfiguration {
 
     @Bean
     fun documentSizePolicy(): DocumentSizePolicy = DocumentSizePolicy()
+
+    @Bean
+    fun documentFormatPolicy(properties: ArchivingProperties): DocumentFormatPolicy =
+        DocumentFormatPolicy.ofExtensions(properties.allowedExtensions)
 
     @Bean
     fun archiveDocumentUseCase(

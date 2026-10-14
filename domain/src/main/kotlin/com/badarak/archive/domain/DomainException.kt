@@ -26,3 +26,6 @@ class ContentTypeMismatchException(val declaredContentType: String, val format: 
     )
 
 class ContentMismatchException(val format: DocumentFormat) : DomainException("The content does not match a .${format.extension} file")
+
+class InvalidTenantIdException(val value: String) :
+    DomainException("Invalid tenant identifier '$value': expected 1 to ${TenantId.MAX_LENGTH} characters, not only spaces")

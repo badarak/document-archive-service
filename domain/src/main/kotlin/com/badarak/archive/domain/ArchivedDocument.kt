@@ -13,6 +13,7 @@ import java.time.Instant
  */
 class ArchivedDocument(
     val id: DocumentId,
+    val tenantId: TenantId,
     val documentType: DocumentType,
     val source: String,
     val businessReference: String?,
@@ -47,6 +48,7 @@ class ArchivedDocument(
         if (!status.canTransitionTo(target)) throw InvalidStatusTransitionException(status, target)
         return ArchivedDocument(
             id = id,
+            tenantId = tenantId,
             documentType = documentType,
             source = source,
             businessReference = businessReference,
@@ -78,6 +80,7 @@ class ArchivedDocument(
 
         fun create(
             id: DocumentId,
+            tenantId: TenantId,
             documentType: DocumentType,
             source: String,
             businessReference: String?,
@@ -93,6 +96,7 @@ class ArchivedDocument(
             sizePolicy.check(sizeBytes)
             return ArchivedDocument(
                 id = id,
+                tenantId = tenantId,
                 documentType = documentType,
                 source = source,
                 businessReference = businessReference,

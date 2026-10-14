@@ -24,5 +24,6 @@ class S3StorageConfiguration {
         .forcePathStyle(properties.pathStyleAccess)
         .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
         .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
+        .overrideConfiguration { it.apiCallTimeout(properties.apiCallTimeout) }
         .build()
 }

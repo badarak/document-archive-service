@@ -15,6 +15,8 @@ class ArchivedDocumentJpaEntity(
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     val id: UUID,
+    @Column(name = "tenant_id", nullable = false, length = 100, updatable = false)
+    val tenantId: String,
     @Column(name = "document_type", nullable = false, length = 50)
     val documentType: String,
     @Column(name = "source", nullable = false, length = 100)

@@ -20,7 +20,6 @@
 
     <modules>
         <module>domain</module>
-        <module>application</module>
         <module>infrastructure</module>
         <module>report</module>
     </modules>
@@ -44,11 +43,6 @@
             <dependency>
                 <groupId>com.badarak</groupId>
                 <artifactId>domain</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.badarak</groupId>
-                <artifactId>application</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -176,7 +170,7 @@
                             <skip>${archive.framework-ban.skip}</skip>
                             <rules>
                                 <bannedDependencies>
-                                    <message>The domain and application modules must stay independent of Spring, JPA/Hibernate and the AWS SDK.</message>
+                                    <message>The domain module must stay independent of Spring, JPA/Hibernate and the AWS SDK.</message>
                                     <excludes>
                                         <exclude>org.springframework*</exclude>
                                         <exclude>jakarta.persistence</exclude>

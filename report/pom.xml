@@ -28,10 +28,6 @@
         </dependency>
         <dependency>
             <groupId>com.badarak</groupId>
-            <artifactId>application</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.badarak</groupId>
             <artifactId>infrastructure</artifactId>
         </dependency>
     </dependencies>
@@ -54,12 +50,6 @@
                             <resources>
                                 <resource>
                                     <directory>${project.basedir}/../domain/target/classes</directory>
-                                    <includes>
-                                        <include>**/*.class</include>
-                                    </includes>
-                                </resource>
-                                <resource>
-                                    <directory>${project.basedir}/../application/target/classes</directory>
                                     <includes>
                                         <include>**/*.class</include>
                                     </includes>

@@ -1,6 +1,5 @@
 package com.badarak.archive.domain.model
 
-/** Root of every business rule violation raised by the domain. */
 sealed class DomainException(message: String) : RuntimeException(message)
 
 class InvalidDocumentTypeException(val value: String) :

@@ -1,6 +1,5 @@
 package com.badarak.archive.domain.model
 
-/** Organisation a document belongs to, taken from the caller's access token. */
 @JvmInline
 value class TenantId(val value: String) {
 

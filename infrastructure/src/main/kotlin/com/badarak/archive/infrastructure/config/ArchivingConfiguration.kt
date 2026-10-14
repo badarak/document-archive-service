@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
 
-/** Builds the archiving service, which stays free of Spring, from the adapters, its policies and a clock. */
 @Configuration
 @EnableConfigurationProperties(ArchivingProperties::class)
 class ArchivingConfiguration {

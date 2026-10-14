@@ -12,7 +12,6 @@ import java.text.Normalizer
 @JvmInline
 value class FileName private constructor(val value: String) {
 
-    /** Lowercase extension without the dot, or an empty string when the name has none. */
     val extension: String
         get() = value.substringAfterLast('.', "").lowercase()
 

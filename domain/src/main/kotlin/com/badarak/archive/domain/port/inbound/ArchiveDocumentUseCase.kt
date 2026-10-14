@@ -2,9 +2,8 @@ package com.badarak.archive.domain.port.inbound
 
 import com.badarak.archive.domain.model.ArchivedDocument
 
-/** Archives a document sent by a caller: its content goes to the object storage, its metadata to the document store. */
 interface ArchiveDocumentUseCase {
 
-    /** Returns the archived document, AVAILABLE. */
+    /** Stores the content of the document in the object storage and its metadata in the document store, then returns it AVAILABLE. */
     fun archive(command: ArchiveDocumentCommand): ArchivedDocument
 }

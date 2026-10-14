@@ -6,7 +6,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Component
 
-/** Identifies the caller from the claims of its validated access token. */
 @Component
 @EnableConfigurationProperties(CallerClaimsProperties::class)
 class JwtCallerResolver(private val claims: CallerClaimsProperties) {

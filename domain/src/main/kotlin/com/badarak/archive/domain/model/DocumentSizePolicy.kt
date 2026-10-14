@@ -1,9 +1,5 @@
 package com.badarak.archive.domain.model
 
-/**
- * Business rule on the size of an archived document: it must not be empty and must not exceed
- * [maxSizeBytes]. The limit is supplied by the caller; the domain reads no configuration.
- */
 class DocumentSizePolicy(val maxSizeBytes: Long = DEFAULT_MAX_SIZE_BYTES) {
 
     init {

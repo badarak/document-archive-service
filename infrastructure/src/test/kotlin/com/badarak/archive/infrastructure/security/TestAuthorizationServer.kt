@@ -18,6 +18,9 @@ import java.util.Date
  * Stands in for the authorization server in integration tests: signs access tokens with its private
  * key and publishes only the matching public key over HTTP. It lives as long as the test JVM, so
  * every test shares the same key set URI.
+ *
+ * The foreign key pair shares the identifier of the signing one, so a forged token is rejected on its
+ * signature alone.
  */
 object TestAuthorizationServer {
     const val ISSUER = "https://auth.test"
@@ -59,6 +62,5 @@ object TestAuthorizationServer {
             .serialize()
     }
 
-    // Both key pairs share the same identifier, so a forged token is rejected on its signature alone.
     private fun generateKeyPair(): RSAKey = RSAKeyGenerator(2048).keyID("test-key").generate()
 }

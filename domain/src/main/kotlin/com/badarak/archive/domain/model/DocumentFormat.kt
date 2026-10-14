@@ -16,7 +16,6 @@ enum class DocumentFormat(val extension: String, val contentTypes: Set<String>, 
     EML("eml", setOf("message/rfc822"), null),
     ;
 
-    /** Whether [header], the first [HEADER_LENGTH] bytes of a file or fewer, carries this format's signature. */
     fun matchesContent(header: ByteArray): Boolean = signature?.invoke(header) ?: true
 
     companion object {

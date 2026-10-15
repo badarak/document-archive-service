@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema
     name = "ArchiveMetadata",
     description = "Business metadata of a document; any source field is ignored, the source comes from the token",
 )
-class ArchiveMetadataRequest(
+data class ArchiveMetadataRequest(
     @field:Schema(example = "INVOICE")
     val documentType: String,
     @field:Schema(example = "INV-2026-000123")

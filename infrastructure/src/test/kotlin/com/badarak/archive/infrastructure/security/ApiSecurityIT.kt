@@ -18,7 +18,6 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
@@ -92,7 +91,11 @@ class ApiSecurityIT {
     @Test
     fun `archiving a document requires the write scope`() {
         mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isForbidden() } }
-        mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `a token with the write scope reaches the archiving endpoint, which then refuses a request that is not multipart`() {
+        mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isUnsupportedMediaType() } }
     }
 
     @Test
@@ -121,7 +124,7 @@ class ApiSecurityIT {
         header(HttpHeaders.AUTHORIZATION, "Bearer $token")
     }
 
-    /** Stands in for the document API, which does not exist yet. */
+    /** Stands in for the read and delete endpoints of the document API, which do not exist yet. */
     @RestController
     @RequestMapping(DOCUMENTS)
     class DocumentsStubController {
@@ -131,9 +134,6 @@ class ApiSecurityIT {
 
         @GetMapping("/{id}")
         fun get(): String = "found"
-
-        @PostMapping
-        fun archive(): String = "archived"
 
         @DeleteMapping("/{id}")
         fun delete(): String = "deleted"

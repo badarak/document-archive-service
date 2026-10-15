@@ -25,6 +25,8 @@ import java.util.Date
 object TestAuthorizationServer {
     const val ISSUER = "https://auth.test"
     const val AUDIENCE = "document-archive-service"
+    const val TENANT = "acme"
+    const val CLIENT = "billing-service"
 
     private val signingKeyPair: RSAKey = generateKeyPair()
     private val foreignKeyPair: RSAKey = generateKeyPair()
@@ -47,6 +49,8 @@ object TestAuthorizationServer {
         expiresAt: Instant = Instant.now().plusSeconds(300),
         scope: String? = null,
         signedByServer: Boolean = true,
+        tenant: String? = TENANT,
+        client: String? = CLIENT,
     ): String {
         val keyPair = if (signedByServer) signingKeyPair else foreignKeyPair
         val claims = JWTClaimsSet.Builder()
@@ -56,6 +60,8 @@ object TestAuthorizationServer {
             .issueTime(Date.from(expiresAt.minusSeconds(600)))
             .expirationTime(Date.from(expiresAt))
             .apply { scope?.let { claim("scope", it) } }
+            .apply { tenant?.let { claim("tenant_id", it) } }
+            .apply { client?.let { claim("azp", it) } }
             .build()
         return SignedJWT(JWSHeader.Builder(JWSAlgorithm.RS256).keyID(keyPair.keyID).build(), claims)
             .apply { sign(RSASSASigner(keyPair)) }

@@ -12,6 +12,7 @@ import com.badarak.archive.domain.model.InvalidStatusTransitionException
 import com.badarak.archive.domain.model.InvalidTenantIdException
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
+import com.badarak.archive.domain.port.outbound.MissingObjectException
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -54,8 +55,14 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
 
     @ExceptionHandler(ObjectStorageException::class, DocumentPersistenceException::class)
     fun handleUnavailableArchive(error: RuntimeException): ProblemDetail {
-        log.error("Archiving failed: {}", error.message, error)
+        log.error("Archive unavailable: {}", error.message, error)
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "archive-unavailable", "The archive is temporarily unavailable, retry later")
+    }
+
+    @ExceptionHandler(MissingObjectException::class)
+    fun handleMissingContent(error: MissingObjectException): ProblemDetail {
+        log.error("Content missing from the storage for an available document: {}", error.message, error)
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "content-missing", "The content of this document cannot be found")
     }
 
     override fun handleMaxUploadSizeExceededException(

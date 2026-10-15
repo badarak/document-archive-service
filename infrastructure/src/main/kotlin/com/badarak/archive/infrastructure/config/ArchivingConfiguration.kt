@@ -3,10 +3,12 @@ package com.badarak.archive.infrastructure.config
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.inbound.DownloadDocumentUseCase
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.service.ArchiveDocumentService
+import com.badarak.archive.domain.service.DownloadDocumentService
 import com.badarak.archive.domain.service.GetDocumentService
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -38,4 +40,8 @@ class ArchivingConfiguration {
 
     @Bean
     fun getDocumentUseCase(documents: DocumentRepository): GetDocumentUseCase = GetDocumentService(documents)
+
+    @Bean
+    fun downloadDocumentUseCase(getDocument: GetDocumentUseCase, storage: ObjectStorage): DownloadDocumentUseCase =
+        DownloadDocumentService(getDocument, storage)
 }

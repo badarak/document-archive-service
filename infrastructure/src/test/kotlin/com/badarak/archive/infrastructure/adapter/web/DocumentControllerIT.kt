@@ -21,9 +21,12 @@ import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.inbound.DocumentDownload
 import com.badarak.archive.domain.port.inbound.DocumentQuery
+import com.badarak.archive.domain.port.inbound.DownloadDocumentUseCase
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
+import com.badarak.archive.domain.port.outbound.MissingObjectException
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import io.mockk.clearMocks
@@ -33,6 +36,7 @@ import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -56,6 +60,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
+import java.io.ByteArrayInputStream
 import java.time.Instant
 
 @SpringBootTest
@@ -73,13 +78,16 @@ class DocumentControllerIT {
     @Autowired
     private lateinit var getDocument: GetDocumentUseCase
 
+    @Autowired
+    private lateinit var downloadDocument: DownloadDocumentUseCase
+
     private val content = "%PDF-1.7\n%âãÏÓ".toByteArray()
     private var received: ArchiveDocumentCommand? = null
     private var receivedBytes: ByteArray? = null
 
     @BeforeEach
     fun acceptEveryDocument() {
-        clearMocks(useCase, getDocument)
+        clearMocks(useCase, getDocument, downloadDocument)
         every { useCase.archive(any()) } answers {
             val command = firstArg<ArchiveDocumentCommand>()
             received = command
@@ -228,6 +236,79 @@ class DocumentControllerIT {
     }
 
     @Nested
+    inner class Download {
+
+        private val query = slot<DocumentQuery>()
+
+        @Test
+        fun `streams the content as an attachment with its type, size and file name`() {
+            val stream = TrackedStream(content)
+            every { downloadDocument.download(capture(query)) } returns DocumentDownload(stored("facture-é.pdf"), stream)
+
+            val response = mockMvc.get("$DOCUMENTS/$ID/content") { header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}") }
+                .andExpect {
+                    status { isOk() }
+                    content { contentType("application/pdf") }
+                    header { longValue(HttpHeaders.CONTENT_LENGTH, content.size.toLong()) }
+                    header { string(HttpHeaders.CONTENT_DISPOSITION, DISPOSITION) }
+                }
+                .andReturn()
+
+            assertArrayEquals(content, response.response.contentAsByteArray)
+            assertTrue(stream.closed)
+            assertEquals(DocumentId.parse(ID), query.captured.id)
+            assertEquals(TenantId("acme"), query.captured.caller.tenantId)
+        }
+
+        @Test
+        fun `a document that is not found is answered with 404, whatever the accepted type`() {
+            every { downloadDocument.download(any()) } throws DocumentNotFoundException(DocumentId.parse(ID))
+
+            mockMvc.get("$DOCUMENTS/$ID/content") {
+                header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}")
+                accept = MediaType.APPLICATION_PDF
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("document-not-found") }
+            }
+        }
+
+        @Test
+        fun `a content missing from the storage is answered with 500, without internal details`() {
+            val key = ObjectKey("documents/secret-key")
+            every { downloadDocument.download(any()) } throws MissingObjectException(key, RuntimeException("NoSuchKey"))
+
+            mockMvc.get("$DOCUMENTS/$ID/content") { header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}") }.andExpect {
+                status { isInternalServerError() }
+                jsonPath("$.code") { value("content-missing") }
+                jsonPath("$.detail") { value("The content of this document cannot be found") }
+            }
+        }
+
+        @Test
+        fun `an unreachable storage is answered with 503`() {
+            every { downloadDocument.download(any()) } throws ObjectStorageException("Bucket 'secret' unreachable", RuntimeException())
+
+            mockMvc.get("$DOCUMENTS/$ID/content") { header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}") }.andExpect {
+                status { isServiceUnavailable() }
+                jsonPath("$.code") { value("archive-unavailable") }
+            }
+        }
+
+        private fun stored(fileName: String) = ArchivedDocument(
+            id = DocumentId.parse(ID),
+            owner = DocumentOwner(TenantId("acme"), "billing-service"),
+            metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
+            content = DocumentContent(fileName, "application/pdf", content.size.toLong(), ObjectKey.generate()),
+            status = DocumentStatus.AVAILABLE,
+            createdAt = Instant.parse("2026-10-15T09:15:00Z"),
+            updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+        )
+
+        private fun readToken() = TestAuthorizationServer.token(scope = "documents:read")
+    }
+
+    @Nested
     inner class Errors {
 
         @ParameterizedTest(name = "{1} {2}")
@@ -327,10 +408,15 @@ class DocumentControllerIT {
         @Bean
         @Primary
         fun getDocumentUseCaseStub(): GetDocumentUseCase = mockk()
+
+        @Bean
+        @Primary
+        fun downloadDocumentUseCaseStub(): DownloadDocumentUseCase = mockk()
     }
 
     companion object {
         private const val DOCUMENTS = "/api/v1/documents"
+        private const val DISPOSITION = "attachment; filename=\"facture-e.pdf\"; filename*=UTF-8''facture-%C3%A9.pdf"
         private const val ID = "7d7d57e1-4c50-4cb9-98b8-c5b60e8a2f01"
         private const val METADATA = """
             {"documentType": "INVOICE", "businessReference": "INV-2026-000123",
@@ -355,5 +441,14 @@ class DocumentControllerIT {
         fun authorizationServerProperties(registry: DynamicPropertyRegistry) {
             registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri") { TestAuthorizationServer.jwksUri }
         }
+    }
+}
+
+private class TrackedStream(bytes: ByteArray) : ByteArrayInputStream(bytes) {
+    var closed = false
+
+    override fun close() {
+        closed = true
+        super.close()
     }
 }

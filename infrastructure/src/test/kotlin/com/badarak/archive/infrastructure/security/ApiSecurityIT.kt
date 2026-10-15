@@ -109,6 +109,10 @@ class ApiSecurityIT {
         getDocuments(TestAuthorizationServer.token(scope = "profile $READ")).andExpect { status { isOk() } }
         mockMvc.get("$DOCUMENTS/${UUID.randomUUID()}") { bearer(TestAuthorizationServer.token(scope = READ)) }
             .andExpect { status { isNotFound() } }
+        mockMvc.get("$DOCUMENTS/${UUID.randomUUID()}/content") { bearer(TestAuthorizationServer.token(scope = WRITE)) }
+            .andExpect { status { isForbidden() } }
+        mockMvc.get("$DOCUMENTS/${UUID.randomUUID()}/content") { bearer(TestAuthorizationServer.token(scope = READ)) }
+            .andExpect { status { isNotFound() } }
     }
 
     @Test

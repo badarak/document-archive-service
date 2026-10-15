@@ -6,11 +6,13 @@ import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
+import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.TenantId
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -69,6 +71,38 @@ class DocumentRepositoryAdapterIT {
         assertEquals("AVAILABLE", stored.status)
         assertEquals(createdAt, stored.createdAt)
         assertEquals(later, stored.updatedAt)
+    }
+
+    @Test
+    fun `a stored document is read back with all its fields for its tenant`() {
+        val document = pendingDocument().markAvailable(later)
+        adapter.save(document)
+
+        val found = adapter.findByIdAndTenant(document.id, TenantId("acme"))!!
+
+        assertEquals(document.id, found.id)
+        assertEquals(document.owner, found.owner)
+        assertEquals(document.metadata.documentType, found.metadata.documentType)
+        assertEquals(document.metadata.businessReference, found.metadata.businessReference)
+        assertEquals(document.metadata.description, found.metadata.description)
+        assertEquals(document.metadata.tags, found.metadata.tags)
+        assertEquals(document.content, found.content)
+        assertEquals(DocumentStatus.AVAILABLE, found.status)
+        assertEquals(createdAt, found.createdAt)
+        assertEquals(later, found.updatedAt)
+    }
+
+    @Test
+    fun `a document of another tenant is not found`() {
+        val document = pendingDocument()
+        adapter.save(document)
+
+        assertNull(adapter.findByIdAndTenant(document.id, TenantId("globex")))
+    }
+
+    @Test
+    fun `an unknown document is not found`() {
+        assertNull(adapter.findByIdAndTenant(DocumentId.generate(), TenantId("acme")))
     }
 
     private fun pendingDocument(): ArchivedDocument = ArchivedDocument.create(

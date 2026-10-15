@@ -28,7 +28,7 @@ jobs:
 
       # Runs unit and integration tests, ktlint, the enforcer rules and the aggregated coverage threshold.
       - name: Build and verify
-        run: ./mvnw -B -ntp clean verify
+        run: mvn -B -ntp clean verify
 
       - name: Upload coverage report
         if: always()

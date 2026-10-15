@@ -28,3 +28,5 @@ class ContentMismatchException(val format: DocumentFormat) : DomainException("Th
 
 class InvalidTenantIdException(val value: String) :
     DomainException("Invalid tenant identifier '$value': expected 1 to ${TenantId.MAX_LENGTH} characters, not only spaces")
+
+class DocumentNotFoundException(val id: DocumentId) : DomainException("Document $id not found")

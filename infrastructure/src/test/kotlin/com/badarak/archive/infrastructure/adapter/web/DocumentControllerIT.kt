@@ -1,16 +1,27 @@
 package com.badarak.archive.infrastructure.adapter.web
 
 import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.model.ContentMismatchException
+import com.badarak.archive.domain.model.ContentTypeMismatchException
 import com.badarak.archive.domain.model.DocumentContent
+import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
+import com.badarak.archive.domain.model.DocumentStatus
+import com.badarak.archive.domain.model.DocumentTooLargeException
 import com.badarak.archive.domain.model.DocumentType
+import com.badarak.archive.domain.model.EmptyDocumentException
+import com.badarak.archive.domain.model.InvalidDocumentException
+import com.badarak.archive.domain.model.InvalidStatusTransitionException
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.TenantId
+import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
+import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import io.mockk.clearMocks
 import io.mockk.every
@@ -19,7 +30,11 @@ import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -28,6 +43,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -139,10 +155,79 @@ class DocumentControllerIT {
         verify(exactly = 0) { useCase.archive(any()) }
     }
 
-    private fun post(metadata: String = METADATA): ResultActionsDsl = mockMvc.multipart(DOCUMENTS) {
+    @Nested
+    inner class Errors {
+
+        @ParameterizedTest(name = "{1} {2}")
+        @MethodSource("com.badarak.archive.infrastructure.adapter.web.DocumentControllerIT#archiveErrors")
+        fun `an archiving error is answered as a problem with its status and code`(error: RuntimeException, status: Int, code: String) {
+            every { useCase.archive(any()) } throws error
+
+            post().andExpect {
+                status { isEqualTo(status) }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.status") { value(status) }
+                jsonPath("$.code") { value(code) }
+                jsonPath("$.detail") { exists() }
+            }
+        }
+
+        @Test
+        fun `an unavailable archive is answered without internal details`() {
+            val failure = ObjectStorageException("Could not store object in bucket 'secret-bucket'", RuntimeException())
+            every { useCase.archive(any()) } throws failure
+
+            post().andExpect {
+                status { isServiceUnavailable() }
+                jsonPath("$.detail") { value("The archive is temporarily unavailable, retry later") }
+            }
+        }
+
+        @Test
+        fun `an invalid document type is refused with 400 before the use case`() {
+            post(metadata = """{"documentType": "invoice"}""").andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("invalid-document-type") }
+            }
+
+            verify(exactly = 0) { useCase.archive(any()) }
+        }
+
+        @Test
+        fun `a token without tenant is refused with 403`() {
+            post(token = TestAuthorizationServer.token(scope = "documents:write", tenant = null)).andExpect {
+                status { isForbidden() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.code") { value("caller-not-identified") }
+            }
+
+            verify(exactly = 0) { useCase.archive(any()) }
+        }
+
+        @Test
+        fun `a token without source is refused with 403`() {
+            post(token = TestAuthorizationServer.token(scope = "documents:write", client = null)).andExpect {
+                status { isForbidden() }
+                jsonPath("$.code") { value("caller-not-identified") }
+            }
+        }
+
+        @Test
+        fun `a missing part is answered as a problem`() {
+            mockMvc.multipart(DOCUMENTS) {
+                file(filePart())
+                header(HttpHeaders.AUTHORIZATION, "Bearer ${token()}")
+            }.andExpect {
+                status { isBadRequest() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            }
+        }
+    }
+
+    private fun post(metadata: String = METADATA, token: String = token()): ResultActionsDsl = mockMvc.multipart(DOCUMENTS) {
         file(filePart())
         file(metadataPart(metadata))
-        header(HttpHeaders.AUTHORIZATION, "Bearer ${token()}")
+        header(HttpHeaders.AUTHORIZATION, "Bearer $token")
     }
 
     private fun filePart() = MockMultipartFile("file", "invoice-123.pdf", "application/pdf", content)
@@ -175,6 +260,19 @@ class DocumentControllerIT {
             {"documentType": "INVOICE", "businessReference": "INV-2026-000123",
              "description": "Customer invoice", "tags": {"customerId": "CUST-456"}}
         """
+
+        @JvmStatic
+        fun archiveErrors(): List<Arguments> = listOf(
+            Arguments.of(InvalidDocumentException("fileName", "must contain a file name"), 400, "invalid-document"),
+            Arguments.of(EmptyDocumentException(0), 400, "empty-document"),
+            Arguments.of(DocumentTooLargeException(60_000_000, 52_428_800), 413, "document-too-large"),
+            Arguments.of(UnsupportedDocumentFormatException("setup.exe", listOf("pdf")), 415, "unsupported-format"),
+            Arguments.of(ContentTypeMismatchException("text/plain", DocumentFormat.PDF), 415, "content-type-mismatch"),
+            Arguments.of(ContentMismatchException(DocumentFormat.PDF), 415, "content-mismatch"),
+            Arguments.of(ObjectStorageException("Storage down", RuntimeException()), 503, "archive-unavailable"),
+            Arguments.of(DocumentPersistenceException("Database down", RuntimeException()), 503, "archive-unavailable"),
+            Arguments.of(InvalidStatusTransitionException(DocumentStatus.AVAILABLE, DocumentStatus.FAILED), 500, "internal-error"),
+        )
 
         @JvmStatic
         @DynamicPropertySource

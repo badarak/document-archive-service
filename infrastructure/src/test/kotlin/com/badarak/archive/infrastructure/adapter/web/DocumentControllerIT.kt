@@ -7,6 +7,7 @@ import com.badarak.archive.domain.model.DocumentContent
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
+import com.badarak.archive.domain.model.DocumentNotFoundException
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
@@ -20,12 +21,15 @@ import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.inbound.GetDocumentQuery
+import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -50,6 +54,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
 import java.time.Instant
 
@@ -65,13 +70,16 @@ class DocumentControllerIT {
     @Autowired
     private lateinit var useCase: ArchiveDocumentUseCase
 
+    @Autowired
+    private lateinit var getDocument: GetDocumentUseCase
+
     private val content = "%PDF-1.7\n%âãÏÓ".toByteArray()
     private var received: ArchiveDocumentCommand? = null
     private var receivedBytes: ByteArray? = null
 
     @BeforeEach
     fun acceptEveryDocument() {
-        clearMocks(useCase)
+        clearMocks(useCase, getDocument)
         every { useCase.archive(any()) } answers {
             val command = firstArg<ArchiveDocumentCommand>()
             received = command
@@ -153,6 +161,70 @@ class DocumentControllerIT {
         post(metadata = """{"businessReference": "INV-2026-000123"}""").andExpect { status { isBadRequest() } }
 
         verify(exactly = 0) { useCase.archive(any()) }
+    }
+
+    @Nested
+    inner class Consultation {
+
+        private val query = slot<GetDocumentQuery>()
+
+        @Test
+        fun `an available document is answered with 200 and its metadata, without internal details`() {
+            val metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-1", "Invoice", mapOf("k" to "v"))
+            every { getDocument.get(capture(query)) } returns archived(metadata)
+
+            mockMvc.get("$DOCUMENTS/$ID") { header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}") }.andExpect {
+                status { isOk() }
+                jsonPath("$.id") { value(ID) }
+                jsonPath("$.documentType") { value("INVOICE") }
+                jsonPath("$.businessReference") { value("INV-1") }
+                jsonPath("$.description") { value("Invoice") }
+                jsonPath("$.tags.k") { value("v") }
+                jsonPath("$.fileName") { value("invoice-123.pdf") }
+                jsonPath("$.status") { value("AVAILABLE") }
+                jsonPath("$.updatedAt") { value("2026-10-15T09:15:00Z") }
+                jsonPath("$.objectKey") { doesNotExist() }
+                jsonPath("$.tenantId") { doesNotExist() }
+            }
+
+            assertEquals(DocumentId.parse(ID), query.captured.id)
+            assertEquals(TenantId("acme"), query.captured.caller.tenantId)
+        }
+
+        @Test
+        fun `a document that is not found is answered with 404`() {
+            every { getDocument.get(any()) } throws DocumentNotFoundException(DocumentId.parse(ID))
+
+            mockMvc.get("$DOCUMENTS/$ID") { header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}") }.andExpect {
+                status { isNotFound() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.code") { value("document-not-found") }
+            }
+        }
+
+        @Test
+        fun `an identifier that is not a UUID is refused with 400`() {
+            mockMvc.get("$DOCUMENTS/not-a-uuid") { header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}") }.andExpect {
+                status { isBadRequest() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            }
+
+            verify(exactly = 0) { getDocument.get(any()) }
+        }
+
+        @Test
+        fun `a token without tenant is refused with 403`() {
+            val token = TestAuthorizationServer.token(scope = "documents:read", tenant = null)
+
+            mockMvc.get("$DOCUMENTS/$ID") { header(HttpHeaders.AUTHORIZATION, "Bearer $token") }.andExpect {
+                status { isForbidden() }
+                jsonPath("$.code") { value("caller-not-identified") }
+            }
+
+            verify(exactly = 0) { getDocument.get(any()) }
+        }
+
+        private fun readToken() = TestAuthorizationServer.token(scope = "documents:read")
     }
 
     @Nested
@@ -251,6 +323,10 @@ class DocumentControllerIT {
         @Bean
         @Primary
         fun archiveDocumentUseCaseStub(): ArchiveDocumentUseCase = mockk()
+
+        @Bean
+        @Primary
+        fun getDocumentUseCaseStub(): GetDocumentUseCase = mockk()
     }
 
     companion object {

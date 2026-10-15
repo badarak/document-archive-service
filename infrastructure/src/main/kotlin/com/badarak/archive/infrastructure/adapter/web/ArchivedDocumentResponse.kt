@@ -10,22 +10,28 @@ data class ArchivedDocumentResponse(
     val id: UUID,
     val documentType: String,
     val businessReference: String?,
+    val description: String?,
+    val tags: Map<String, String>,
     val fileName: String,
     val contentType: String,
     val size: Long,
     val status: String,
     val createdAt: Instant,
+    val updatedAt: Instant,
 ) {
     companion object {
         fun from(document: ArchivedDocument) = ArchivedDocumentResponse(
             id = document.id.value,
             documentType = document.metadata.documentType.value,
             businessReference = document.metadata.businessReference,
+            description = document.metadata.description,
+            tags = document.metadata.tags,
             fileName = document.content.fileName,
             contentType = document.content.contentType,
             size = document.content.sizeBytes,
             status = document.status.name,
             createdAt = document.createdAt,
+            updatedAt = document.updatedAt,
         )
     }
 }

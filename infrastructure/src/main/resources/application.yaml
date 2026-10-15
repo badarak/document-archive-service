@@ -1,3 +1,9 @@
+server:
+  tomcat:
+    # A refused upload is read to its end, up to this size, so the client receives the 413 instead of a
+    # connection reset. It stays above the multipart request limit below.
+    max-swallow-size: 64MB
+
 spring:
   application:
     name: document-archive-service

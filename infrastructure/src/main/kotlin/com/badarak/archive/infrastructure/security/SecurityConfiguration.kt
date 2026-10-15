@@ -14,7 +14,7 @@ import org.springframework.security.web.util.matcher.DispatcherTypeRequestMatche
 class SecurityConfiguration {
 
     @Bean
-    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+    fun securityFilterChain(http: HttpSecurity, errorHandler: ProblemDetailsSecurityErrorHandler): SecurityFilterChain {
         http {
             csrf { disable() }
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
@@ -30,7 +30,15 @@ class SecurityConfiguration {
                 authorize(DOCUMENTS, hasAuthority(WRITE_DOCUMENTS))
                 authorize(anyRequest, denyAll)
             }
-            oauth2ResourceServer { jwt { } }
+            oauth2ResourceServer {
+                jwt { }
+                authenticationEntryPoint = errorHandler
+                accessDeniedHandler = errorHandler
+            }
+            exceptionHandling {
+                authenticationEntryPoint = errorHandler
+                accessDeniedHandler = errorHandler
+            }
         }
         return http.build()
     }

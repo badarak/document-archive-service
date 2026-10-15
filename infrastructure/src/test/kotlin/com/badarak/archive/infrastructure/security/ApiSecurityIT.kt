@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -36,6 +37,10 @@ class ApiSecurityIT {
         mockMvc.get(DOCUMENTS).andExpect {
             status { isUnauthorized() }
             header { string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")) }
+            content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            jsonPath("$.status") { value(401) }
+            jsonPath("$.code") { value("unauthenticated") }
+            jsonPath("$.instance") { value(DOCUMENTS) }
         }
     }
 
@@ -65,6 +70,16 @@ class ApiSecurityIT {
     }
 
     @Test
+    fun `an invalid token is answered as a problem`() {
+        getDocuments(TestAuthorizationServer.token(signedByServer = false)).andExpect {
+            status { isUnauthorized() }
+            header { string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer error=\"invalid_token\"")) }
+            content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            jsonPath("$.code") { value("unauthenticated") }
+        }
+    }
+
+    @Test
     fun `an expired token is rejected with 401`() {
         val expired = TestAuthorizationServer.token(expiresAt = Instant.now().minusSeconds(300))
 
@@ -78,7 +93,13 @@ class ApiSecurityIT {
 
     @Test
     fun `a valid token without scope is rejected with 403`() {
-        getDocuments(TestAuthorizationServer.token()).andExpect { status { isForbidden() } }
+        getDocuments(TestAuthorizationServer.token()).andExpect {
+            status { isForbidden() }
+            header { string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")) }
+            content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            jsonPath("$.status") { value(403) }
+            jsonPath("$.code") { value("access-denied") }
+        }
     }
 
     @Test

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
+import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -106,7 +107,8 @@ class ApiSecurityIT {
     fun `reading documents requires the read scope`() {
         getDocuments(TestAuthorizationServer.token(scope = WRITE)).andExpect { status { isForbidden() } }
         getDocuments(TestAuthorizationServer.token(scope = "profile $READ")).andExpect { status { isOk() } }
-        mockMvc.get("$DOCUMENTS/42") { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isOk() } }
+        mockMvc.get("$DOCUMENTS/${UUID.randomUUID()}") { bearer(TestAuthorizationServer.token(scope = READ)) }
+            .andExpect { status { isNotFound() } }
     }
 
     @Test
@@ -145,16 +147,13 @@ class ApiSecurityIT {
         header(HttpHeaders.AUTHORIZATION, "Bearer $token")
     }
 
-    /** Stands in for the read and delete endpoints of the document API, which do not exist yet. */
+    /** Stands in for the search and delete endpoints of the document API, which do not exist yet. */
     @RestController
     @RequestMapping(DOCUMENTS)
     class DocumentsStubController {
 
         @GetMapping
         fun search(): String = "found"
-
-        @GetMapping("/{id}")
-        fun get(): String = "found"
 
         @DeleteMapping("/{id}")
         fun delete(): String = "deleted"

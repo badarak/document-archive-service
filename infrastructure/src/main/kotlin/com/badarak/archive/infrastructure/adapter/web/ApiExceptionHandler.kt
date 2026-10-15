@@ -2,6 +2,7 @@ package com.badarak.archive.infrastructure.adapter.web
 
 import com.badarak.archive.domain.model.ContentMismatchException
 import com.badarak.archive.domain.model.ContentTypeMismatchException
+import com.badarak.archive.domain.model.DocumentNotFoundException
 import com.badarak.archive.domain.model.DocumentTooLargeException
 import com.badarak.archive.domain.model.DomainException
 import com.badarak.archive.domain.model.EmptyDocumentException
@@ -43,6 +44,7 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         is ContentTypeMismatchException -> problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "content-type-mismatch", error.message)
         is ContentMismatchException -> problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "content-mismatch", error.message)
         is InvalidTenantIdException -> problem(HttpStatus.FORBIDDEN, CALLER_NOT_IDENTIFIED, error.message)
+        is DocumentNotFoundException -> problem(HttpStatus.NOT_FOUND, "document-not-found", error.message)
         is InvalidStatusTransitionException -> internalError(error)
     }
 

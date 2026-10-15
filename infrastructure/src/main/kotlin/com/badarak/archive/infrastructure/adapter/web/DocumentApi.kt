@@ -11,6 +11,7 @@ import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.multipart.MultipartFile
+import java.util.UUID
 import io.swagger.v3.oas.annotations.parameters.RequestBody as OpenApiRequestBody
 
 interface DocumentApi {
@@ -67,6 +68,45 @@ interface DocumentApi {
         @Parameter(hidden = true)
         jwt: Jwt,
     ): ResponseEntity<ArchivedDocumentResponse>
+
+    @Operation(
+        summary = "Read the metadata of a document",
+        description = "Returns an AVAILABLE document of the caller's tenant, without its content. The access token needs the " +
+            "documents:read scope. A document that does not exist, belongs to another tenant or is not available is answered " +
+            "with the same 404.",
+    )
+    @ApiResponse(responseCode = "200", description = "Metadata of the document")
+    @ApiResponse(
+        responseCode = "400",
+        description = "Identifier that is not a UUID",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "401",
+        description = "Missing, invalid or expired access token",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "403",
+        description = "Token without the documents:read scope, or without tenant or source claim",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "No available document with this identifier for the caller's tenant",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "503",
+        description = "Document store unavailable",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    fun get(
+        @Parameter(description = "Identifier of the document, as returned when it was archived")
+        id: UUID,
+        @Parameter(hidden = true)
+        jwt: Jwt,
+    ): ArchivedDocumentResponse
 
     companion object {
         const val PROBLEM = MediaType.APPLICATION_PROBLEM_JSON_VALUE

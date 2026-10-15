@@ -21,7 +21,7 @@ import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
-import com.badarak.archive.domain.port.inbound.GetDocumentQuery
+import com.badarak.archive.domain.port.inbound.DocumentQuery
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
@@ -166,7 +166,7 @@ class DocumentControllerIT {
     @Nested
     inner class Consultation {
 
-        private val query = slot<GetDocumentQuery>()
+        private val query = slot<DocumentQuery>()
 
         @Test
         fun `an available document is answered with 200 and its metadata, without internal details`() {

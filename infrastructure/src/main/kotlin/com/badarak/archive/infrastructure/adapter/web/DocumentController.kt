@@ -3,7 +3,7 @@ package com.badarak.archive.infrastructure.adapter.web
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
-import com.badarak.archive.domain.port.inbound.GetDocumentQuery
+import com.badarak.archive.domain.port.inbound.DocumentQuery
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
 import com.badarak.archive.domain.port.inbound.UploadedFile
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -55,5 +55,5 @@ class DocumentController(
 
     @GetMapping("/{id}", produces = [MediaType.APPLICATION_JSON_VALUE])
     override fun get(@PathVariable id: UUID, @AuthenticationPrincipal jwt: Jwt): ArchivedDocumentResponse =
-        ArchivedDocumentResponse.from(getDocument.get(GetDocumentQuery(callerResolver.resolve(jwt), DocumentId(id))))
+        ArchivedDocumentResponse.from(getDocument.get(DocumentQuery(callerResolver.resolve(jwt), DocumentId(id))))
 }

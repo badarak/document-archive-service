@@ -26,9 +26,17 @@ jobs:
           java-version: 21
           cache: maven
 
+      # Pinned Maven version, downloaded from Maven Central rather than taken from the runner image.
+      - name: Set up Maven
+        run: |
+          curl --silent --show-error --fail --location \
+            https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.16/apache-maven-3.9.16-bin.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/apache-maven-3.9.16/bin" >> "$GITHUB_PATH"
+
       # Runs unit and integration tests, ktlint, the enforcer rules and the aggregated coverage threshold.
       - name: Build and verify
-        run: ./mvnw -B -ntp clean verify
+        run: mvn -B -ntp clean verify
 
       - name: Upload coverage report
         if: always()

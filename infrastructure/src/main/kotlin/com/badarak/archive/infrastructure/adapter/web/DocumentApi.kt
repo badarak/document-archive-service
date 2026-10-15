@@ -6,22 +6,13 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Encoding
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
-import io.swagger.v3.oas.annotations.security.SecurityRequirement
-import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.MediaType
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
-import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.multipart.MultipartFile
 import io.swagger.v3.oas.annotations.parameters.RequestBody as OpenApiRequestBody
 
-@Tag(name = "Documents", description = "Archiving of documents sent by other services")
-@SecurityRequirement(name = OpenApiConfiguration.BEARER_JWT)
-@RequestMapping("/api/v1/documents")
 interface DocumentApi {
 
     @Operation(
@@ -68,16 +59,12 @@ interface DocumentApi {
         description = "Object storage or document store unavailable",
         content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
     )
-    @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
     fun archive(
         @Parameter(description = "The file to archive, with its original name and content type")
-        @RequestPart("file")
         file: MultipartFile,
         @Parameter(description = "Business metadata of the document, as JSON")
-        @RequestPart("metadata")
         metadata: ArchiveMetadataRequest,
         @Parameter(hidden = true)
-        @AuthenticationPrincipal
         jwt: Jwt,
     ): ResponseEntity<ArchivedDocumentResponse>
 

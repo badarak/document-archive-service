@@ -1,4 +1,4 @@
-package com.badarak.archive.infrastructure.security
+package com.badarak.archive.infrastructure.adapter.web
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 

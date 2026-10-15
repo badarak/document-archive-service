@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -18,7 +19,6 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
@@ -37,6 +37,10 @@ class ApiSecurityIT {
         mockMvc.get(DOCUMENTS).andExpect {
             status { isUnauthorized() }
             header { string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")) }
+            content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            jsonPath("$.status") { value(401) }
+            jsonPath("$.code") { value("unauthenticated") }
+            jsonPath("$.instance") { value(DOCUMENTS) }
         }
     }
 
@@ -66,6 +70,16 @@ class ApiSecurityIT {
     }
 
     @Test
+    fun `an invalid token is answered as a problem`() {
+        getDocuments(TestAuthorizationServer.token(signedByServer = false)).andExpect {
+            status { isUnauthorized() }
+            header { string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer error=\"invalid_token\"")) }
+            content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            jsonPath("$.code") { value("unauthenticated") }
+        }
+    }
+
+    @Test
     fun `an expired token is rejected with 401`() {
         val expired = TestAuthorizationServer.token(expiresAt = Instant.now().minusSeconds(300))
 
@@ -79,7 +93,13 @@ class ApiSecurityIT {
 
     @Test
     fun `a valid token without scope is rejected with 403`() {
-        getDocuments(TestAuthorizationServer.token()).andExpect { status { isForbidden() } }
+        getDocuments(TestAuthorizationServer.token()).andExpect {
+            status { isForbidden() }
+            header { string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")) }
+            content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            jsonPath("$.status") { value(403) }
+            jsonPath("$.code") { value("access-denied") }
+        }
     }
 
     @Test
@@ -92,7 +112,11 @@ class ApiSecurityIT {
     @Test
     fun `archiving a document requires the write scope`() {
         mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isForbidden() } }
-        mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isOk() } }
+    }
+
+    @Test
+    fun `a token with the write scope reaches the archiving endpoint, which then refuses a request that is not multipart`() {
+        mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isUnsupportedMediaType() } }
     }
 
     @Test
@@ -121,7 +145,7 @@ class ApiSecurityIT {
         header(HttpHeaders.AUTHORIZATION, "Bearer $token")
     }
 
-    /** Stands in for the document API, which does not exist yet. */
+    /** Stands in for the read and delete endpoints of the document API, which do not exist yet. */
     @RestController
     @RequestMapping(DOCUMENTS)
     class DocumentsStubController {
@@ -131,9 +155,6 @@ class ApiSecurityIT {
 
         @GetMapping("/{id}")
         fun get(): String = "found"
-
-        @PostMapping
-        fun archive(): String = "archived"
 
         @DeleteMapping("/{id}")
         fun delete(): String = "deleted"

@@ -82,6 +82,24 @@ The file is looked up in the working directory and in its parent: start the appl
 project root or from the `infrastructure` module. From an IDE, activate the `local` profile and keep
 one of these two working directories.
 
+## API
+
+The API is described by OpenAPI: browse it at <http://localhost:8080/swagger-ui/index.html>, or read
+the raw description at `/v3/api-docs`.
+
+Archiving a document takes a multipart request with a `file` part and a JSON `metadata` part:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/documents \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@invoice-123.pdf;type=application/pdf" \
+  -F 'metadata={"documentType": "INVOICE", "businessReference": "INV-2026-000123"};type=application/json'
+```
+
+The answer is `201 Created`, with the document's `Location` and metadata. Errors are Problem Details
+documents (RFC 9457) with a `code` property, such as `unsupported-format` or `document-too-large`;
+the OpenAPI description lists them per status.
+
 ## Security
 
 The service is an OAuth2 resource server: callers authenticate with a JWT access token sent in the
@@ -91,6 +109,7 @@ The service is an OAuth2 resource server: callers authenticate with a JWT access
 |---|---|
 | `/actuator/health` and its probes | None, so monitoring can call them |
 | `/.well-known/oauth-protected-resource` | None; standard metadata published by Spring Security (the service URL and the bearer method) |
+| `/v3/api-docs` and `/swagger-ui/**` | None; the OpenAPI description of the API |
 | `GET /api/v1/documents/**` | Valid token with the `documents:read` scope |
 | Other methods on `/api/v1/documents/**` | Valid token with the `documents:write` scope |
 | Anything else | Denied, even with a valid token |

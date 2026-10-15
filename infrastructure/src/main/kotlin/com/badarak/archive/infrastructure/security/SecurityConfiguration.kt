@@ -14,7 +14,7 @@ import org.springframework.security.web.util.matcher.DispatcherTypeRequestMatche
 class SecurityConfiguration {
 
     @Bean
-    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+    fun securityFilterChain(http: HttpSecurity, errorHandler: ProblemDetailsSecurityErrorHandler): SecurityFilterChain {
         http {
             csrf { disable() }
             sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
@@ -22,11 +22,23 @@ class SecurityConfiguration {
                 authorize(DispatcherTypeRequestMatcher(DispatcherType.ERROR), permitAll)
                 authorize("/actuator/health", permitAll)
                 authorize("/actuator/health/**", permitAll)
+                authorize("/v3/api-docs", permitAll)
+                authorize("/v3/api-docs/**", permitAll)
+                authorize("/swagger-ui.html", permitAll)
+                authorize("/swagger-ui/**", permitAll)
                 authorize(HttpMethod.GET, DOCUMENTS, hasAuthority(READ_DOCUMENTS))
                 authorize(DOCUMENTS, hasAuthority(WRITE_DOCUMENTS))
                 authorize(anyRequest, denyAll)
             }
-            oauth2ResourceServer { jwt { } }
+            oauth2ResourceServer {
+                jwt { }
+                authenticationEntryPoint = errorHandler
+                accessDeniedHandler = errorHandler
+            }
+            exceptionHandling {
+                authenticationEntryPoint = errorHandler
+                accessDeniedHandler = errorHandler
+            }
         }
         return http.build()
     }

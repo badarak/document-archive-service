@@ -1,4 +1,4 @@
-package com.badarak.archive.infrastructure.security
+package com.badarak.archive.infrastructure.adapter.web
 
 import com.badarak.archive.domain.model.InvalidTenantIdException
 import com.badarak.archive.domain.model.TenantId

@@ -24,3 +24,14 @@ databaseChangeLog:
         - sqlFile:
             path: sql/002-add-tenant-to-archived-document.rollback.sql
             relativeToChangelogFile: true
+  - changeSet:
+      id: 003-add-search-indexes-to-archived-document
+      author: badarak
+      changes:
+        - sqlFile:
+            path: sql/003-add-search-indexes-to-archived-document.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sqlFile:
+            path: sql/003-add-search-indexes-to-archived-document.rollback.sql
+            relativeToChangelogFile: true

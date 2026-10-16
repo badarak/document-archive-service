@@ -53,21 +53,25 @@ class ArchivedDocumentSchemaIT {
 
     @Test
     fun `liquibase creates the index on tenant, source and business reference`() {
-        val indexes = jdbcTemplate.queryForList(
-            "SELECT lower(index_name) FROM information_schema.indexes " +
-                "WHERE lower(table_schema) = 'archive' AND lower(table_name) = 'archived_document'",
-            String::class.java,
-        )
+        val indexes = indexes()
 
         assertTrue("idx_archived_document_tenant_source_business_reference" in indexes)
         assertFalse("idx_archived_document_source_business_reference" in indexes)
     }
 
     @Test
+    fun `liquibase creates the search indexes on tenant and creation date`() {
+        val indexes = indexes()
+
+        assertTrue("idx_archived_document_tenant_created" in indexes)
+        assertTrue("idx_archived_document_tenant_type_created" in indexes)
+    }
+
+    @Test
     fun `running liquibase again does not replay applied changesets`() {
         liquibase.afterPropertiesSet()
 
-        assertEquals(2, appliedChangeSetCount())
+        assertEquals(3, appliedChangeSetCount())
     }
 
     @Test
@@ -134,6 +138,12 @@ class ArchivedDocumentSchemaIT {
             OffsetDateTime.now(),
         )
     }
+
+    private fun indexes(): List<String?> = jdbcTemplate.queryForList(
+        "SELECT lower(index_name) FROM information_schema.indexes " +
+            "WHERE lower(table_schema) = 'archive' AND lower(table_name) = 'archived_document'",
+        String::class.java,
+    )
 
     private fun appliedChangeSetCount(): Int? = jdbcTemplate.queryForObject(
         "SELECT count(*) FROM archive.databasechangelog",

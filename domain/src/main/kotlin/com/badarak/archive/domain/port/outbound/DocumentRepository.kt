@@ -2,6 +2,10 @@ package com.badarak.archive.domain.port.outbound
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentPage
+import com.badarak.archive.domain.model.DocumentSearchCriteria
+import com.badarak.archive.domain.model.DocumentStatus
+import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.model.TenantId
 
 interface DocumentRepository {
@@ -20,6 +24,14 @@ interface DocumentRepository {
      * @throws DocumentPersistenceException when the store cannot be reached
      */
     fun findByIdAndTenant(id: DocumentId, tenantId: TenantId): ArchivedDocument?
+
+    /**
+     * Returns the requested page of the documents of [tenantId] in [status] that match [criteria], newest first. Documents
+     * created at the same instant are ordered by identifier, so that consecutive pages never overlap.
+     *
+     * @throws DocumentPersistenceException when the store cannot be reached
+     */
+    fun search(tenantId: TenantId, status: DocumentStatus, criteria: DocumentSearchCriteria, page: PageRequest): DocumentPage
 }
 
 class DocumentPersistenceException(message: String, cause: Throwable) : RuntimeException(message, cause)

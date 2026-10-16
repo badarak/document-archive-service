@@ -12,6 +12,7 @@ import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.multipart.MultipartFile
+import java.time.Instant
 import java.util.UUID
 import io.swagger.v3.oas.annotations.parameters.RequestBody as OpenApiRequestBody
 
@@ -69,6 +70,52 @@ interface DocumentApi {
         @Parameter(hidden = true)
         jwt: Jwt,
     ): ResponseEntity<ArchivedDocumentResponse>
+
+    @Operation(
+        summary = "Search the documents",
+        description = "Returns a page of the AVAILABLE documents of the caller's tenant matching every given filter, newest " +
+            "first, then by descending identifier. The access token needs the documents:read scope. A page beyond the last " +
+            "one is empty.",
+    )
+    @ApiResponse(responseCode = "200", description = "The requested page of matching documents")
+    @ApiResponse(
+        responseCode = "400",
+        description = "Malformed filter, period ending before it starts, negative page, or size out of 1 to 100",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "401",
+        description = "Missing, invalid or expired access token",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "403",
+        description = "Token without the documents:read scope, or without tenant or source claim",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "503",
+        description = "Document store unavailable",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    fun search(
+        @Parameter(description = "Exact document type, such as INVOICE")
+        documentType: String?,
+        @Parameter(description = "Exact source, the service that archived the document")
+        source: String?,
+        @Parameter(description = "Exact business reference")
+        businessReference: String?,
+        @Parameter(description = "Earliest creation instant, inclusive, in ISO-8601 with an offset (2026-10-15T14:30:00Z)")
+        createdFrom: Instant?,
+        @Parameter(description = "Latest creation instant, inclusive, in ISO-8601 with an offset (2026-10-15T14:30:00Z)")
+        createdTo: Instant?,
+        @Parameter(description = "Number of the page, from 0", schema = Schema(defaultValue = "0", minimum = "0"))
+        page: Int?,
+        @Parameter(description = "Number of documents per page", schema = Schema(defaultValue = "20", minimum = "1", maximum = "100"))
+        size: Int?,
+        @Parameter(hidden = true)
+        jwt: Jwt,
+    ): DocumentPageResponse
 
     @Operation(
         summary = "Read the metadata of a document",

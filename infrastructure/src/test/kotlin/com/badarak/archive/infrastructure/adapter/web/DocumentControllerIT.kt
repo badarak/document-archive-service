@@ -8,6 +8,8 @@ import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentNotFoundException
 import com.badarak.archive.domain.model.DocumentOwner
+import com.badarak.archive.domain.model.DocumentPage
+import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentTooLargeException
@@ -16,6 +18,7 @@ import com.badarak.archive.domain.model.EmptyDocumentException
 import com.badarak.archive.domain.model.InvalidDocumentException
 import com.badarak.archive.domain.model.InvalidStatusTransitionException
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
@@ -23,8 +26,10 @@ import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import com.badarak.archive.domain.port.inbound.DocumentDownload
 import com.badarak.archive.domain.port.inbound.DocumentQuery
+import com.badarak.archive.domain.port.inbound.DocumentSearchQuery
 import com.badarak.archive.domain.port.inbound.DownloadDocumentUseCase
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
+import com.badarak.archive.domain.port.inbound.SearchDocumentsUseCase
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.MissingObjectException
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
@@ -43,6 +48,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -81,13 +87,16 @@ class DocumentControllerIT {
     @Autowired
     private lateinit var downloadDocument: DownloadDocumentUseCase
 
+    @Autowired
+    private lateinit var searchDocuments: SearchDocumentsUseCase
+
     private val content = "%PDF-1.7\n%âãÏÓ".toByteArray()
     private var received: ArchiveDocumentCommand? = null
     private var receivedBytes: ByteArray? = null
 
     @BeforeEach
     fun acceptEveryDocument() {
-        clearMocks(useCase, getDocument, downloadDocument)
+        clearMocks(useCase, getDocument, downloadDocument, searchDocuments)
         every { useCase.archive(any()) } answers {
             val command = firstArg<ArchiveDocumentCommand>()
             received = command
@@ -309,6 +318,140 @@ class DocumentControllerIT {
     }
 
     @Nested
+    inner class Search {
+
+        private val query = slot<DocumentSearchQuery>()
+
+        @BeforeEach
+        fun answerAnEmptyPage() {
+            every { searchDocuments.search(capture(query)) } answers { DocumentPage(emptyList(), firstArg<DocumentSearchQuery>().page, 0) }
+        }
+
+        @Test
+        fun `a page of documents is answered with 200, its documents and its counts`() {
+            val document = archived(DocumentMetadata(DocumentType("INVOICE"), "INV-1", null, emptyMap()))
+            every { searchDocuments.search(any()) } returns DocumentPage(listOf(document), PageRequest(1, 2), 3)
+
+            search("page=1&size=2").andExpect {
+                status { isOk() }
+                jsonPath("$.content[0].id") { value(ID) }
+                jsonPath("$.content[0].documentType") { value("INVOICE") }
+                jsonPath("$.content[0].fileName") { value("invoice-123.pdf") }
+                jsonPath("$.content[0].size") { value(content.size) }
+                jsonPath("$.content[0].status") { value("AVAILABLE") }
+                jsonPath("$.content[0].objectKey") { doesNotExist() }
+                jsonPath("$.page") { value(1) }
+                jsonPath("$.size") { value(2) }
+                jsonPath("$.totalElements") { value(3) }
+                jsonPath("$.totalPages") { value(2) }
+            }
+        }
+
+        @Test
+        fun `passes the caller from the token, every filter and the page to the use case`() {
+            val query = "documentType=INVOICE&source=billing-service&businessReference=INV-1" +
+                "&createdFrom=2026-10-01T00:00:00Z&createdTo=2026-10-15T16:30:00+02:00&page=3&size=50"
+
+            search(query).andExpect { status { isOk() } }
+
+            val received = this.query.captured
+            assertEquals(TenantId("acme"), received.caller.tenantId)
+            assertEquals(
+                DocumentSearchCriteria(
+                    DocumentType("INVOICE"),
+                    "billing-service",
+                    "INV-1",
+                    Instant.parse("2026-10-01T00:00:00Z"),
+                    Instant.parse("2026-10-15T14:30:00Z"),
+                ),
+                received.criteria,
+            )
+            assertEquals(PageRequest(3, 50), received.page)
+        }
+
+        @Test
+        fun `without parameter, every document is searched in pages of 20 from the first one`() {
+            search().andExpect {
+                status { isOk() }
+                jsonPath("$.content") { isEmpty() }
+                jsonPath("$.page") { value(0) }
+                jsonPath("$.size") { value(20) }
+                jsonPath("$.totalPages") { value(0) }
+            }
+
+            assertEquals(DocumentSearchCriteria(), query.captured.criteria)
+            assertEquals(PageRequest(), query.captured.page)
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(
+            strings = [
+                "size=0",
+                "size=101",
+                "page=-1",
+                "source=",
+                "businessReference= ",
+                "createdFrom=2026-10-15T00:00:00Z&createdTo=2026-10-14T00:00:00Z",
+            ],
+        )
+        fun `invalid search parameters are refused with 400 before the use case`(parameters: String) {
+            search(parameters).andExpect {
+                status { isBadRequest() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.code") { value("invalid-search") }
+            }
+
+            verify(exactly = 0) { searchDocuments.search(any()) }
+        }
+
+        @Test
+        fun `a malformed document type is refused with 400`() {
+            search("documentType=invoice").andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("invalid-document-type") }
+            }
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = ["createdFrom=2026-10-15T14:30:00", "createdTo=yesterday", "page=first", "size=ten"])
+        fun `a parameter that cannot be read is refused with 400`(parameters: String) {
+            search(parameters).andExpect {
+                status { isBadRequest() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            }
+
+            verify(exactly = 0) { searchDocuments.search(any()) }
+        }
+
+        @Test
+        fun `an unavailable document store is answered with 503`() {
+            every { searchDocuments.search(any()) } throws DocumentPersistenceException("Database down", RuntimeException())
+
+            search().andExpect {
+                status { isServiceUnavailable() }
+                jsonPath("$.code") { value("archive-unavailable") }
+            }
+        }
+
+        @Test
+        fun `a token without tenant is refused with 403`() {
+            val token = TestAuthorizationServer.token(scope = "documents:read", tenant = null)
+
+            mockMvc.get(DOCUMENTS) { header(HttpHeaders.AUTHORIZATION, "Bearer $token") }.andExpect {
+                status { isForbidden() }
+                jsonPath("$.code") { value("caller-not-identified") }
+            }
+
+            verify(exactly = 0) { searchDocuments.search(any()) }
+        }
+
+        private fun search(parameters: String = ""): ResultActionsDsl = mockMvc.get(DOCUMENTS) {
+            header(HttpHeaders.AUTHORIZATION, "Bearer ${TestAuthorizationServer.token(scope = "documents:read")}")
+            parameters.split("&").filter { it.isNotEmpty() }.forEach { param(it.substringBefore("="), it.substringAfter("=")) }
+        }
+    }
+
+    @Nested
     inner class Errors {
 
         @ParameterizedTest(name = "{1} {2}")
@@ -412,6 +555,10 @@ class DocumentControllerIT {
         @Bean
         @Primary
         fun downloadDocumentUseCaseStub(): DownloadDocumentUseCase = mockk()
+
+        @Bean
+        @Primary
+        fun searchDocumentsUseCaseStub(): SearchDocumentsUseCase = mockk()
     }
 
     companion object {

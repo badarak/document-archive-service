@@ -1,7 +1,6 @@
 package com.badarak.archive.infrastructure.adapter.persistence
 
 import com.badarak.archive.domain.model.ArchivedDocument
-import com.badarak.archive.domain.model.DocumentContent
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
@@ -9,6 +8,7 @@ import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -53,7 +53,7 @@ class DocumentRepositoryAdapterIT {
         assertEquals("invoice-123.pdf", stored.fileName)
         assertEquals("application/pdf", stored.contentType)
         assertEquals(248_120, stored.sizeBytes)
-        assertEquals(document.content.objectKey.value, stored.objectKey)
+        assertEquals(document.file.objectKey.value, stored.objectKey)
         assertEquals("PENDING", stored.status)
         assertEquals(createdAt, stored.createdAt)
         assertEquals(createdAt, stored.updatedAt)
@@ -86,7 +86,7 @@ class DocumentRepositoryAdapterIT {
         assertEquals(document.metadata.businessReference, found.metadata.businessReference)
         assertEquals(document.metadata.description, found.metadata.description)
         assertEquals(document.metadata.tags, found.metadata.tags)
-        assertEquals(document.content, found.content)
+        assertEquals(document.file, found.file)
         assertEquals(DocumentStatus.AVAILABLE, found.status)
         assertEquals(createdAt, found.createdAt)
         assertEquals(later, found.updatedAt)
@@ -109,7 +109,7 @@ class DocumentRepositoryAdapterIT {
         id = DocumentId.generate(),
         owner = DocumentOwner(TenantId("acme"), "BILLING-SERVICE"),
         metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
-        content = DocumentContent("invoice-123.pdf", "application/pdf", 248_120, ObjectKey.generate()),
+        file = StoredFile("invoice-123.pdf", "application/pdf", 248_120, ObjectKey.generate()),
         sizePolicy = DocumentSizePolicy(),
         now = createdAt,
     )

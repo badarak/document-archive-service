@@ -10,5 +10,5 @@ interface GetDocumentUseCase {
      * @throws com.badarak.archive.domain.model.DocumentNotFoundException otherwise, whether the document does not exist,
      * belongs to another tenant or is in another status, so that its existence is never revealed
      */
-    fun get(query: GetDocumentQuery): ArchivedDocument
+    fun get(query: DocumentQuery): ArchivedDocument
 }

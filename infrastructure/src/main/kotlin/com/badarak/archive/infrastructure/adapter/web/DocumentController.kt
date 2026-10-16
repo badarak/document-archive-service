@@ -3,11 +3,16 @@ package com.badarak.archive.infrastructure.adapter.web
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
-import com.badarak.archive.domain.port.inbound.GetDocumentQuery
+import com.badarak.archive.domain.port.inbound.DocumentQuery
+import com.badarak.archive.domain.port.inbound.DownloadDocumentUseCase
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
 import com.badarak.archive.domain.port.inbound.UploadedFile
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.core.io.InputStreamResource
+import org.springframework.core.io.Resource
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -20,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 @Tag(name = "Documents", description = "Archiving of documents sent by other services")
@@ -29,6 +35,7 @@ import java.util.UUID
 class DocumentController(
     private val archiveDocument: ArchiveDocumentUseCase,
     private val getDocument: GetDocumentUseCase,
+    private val downloadDocument: DownloadDocumentUseCase,
     private val callerResolver: JwtCallerResolver,
 ) : DocumentApi {
 
@@ -55,5 +62,17 @@ class DocumentController(
 
     @GetMapping("/{id}", produces = [MediaType.APPLICATION_JSON_VALUE])
     override fun get(@PathVariable id: UUID, @AuthenticationPrincipal jwt: Jwt): ArchivedDocumentResponse =
-        ArchivedDocumentResponse.from(getDocument.get(GetDocumentQuery(callerResolver.resolve(jwt), DocumentId(id))))
+        ArchivedDocumentResponse.from(getDocument.get(DocumentQuery(callerResolver.resolve(jwt), DocumentId(id))))
+
+    @GetMapping("/{id}/content")
+    override fun download(@PathVariable id: UUID, @AuthenticationPrincipal jwt: Jwt): ResponseEntity<Resource> {
+        val download = downloadDocument.download(DocumentQuery(callerResolver.resolve(jwt), DocumentId(id)))
+        val file = download.document.file
+        val disposition = ContentDisposition.attachment().filename(file.fileName, StandardCharsets.UTF_8).build()
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(file.contentType))
+            .contentLength(file.sizeBytes)
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+            .body(InputStreamResource(download.content))
+    }
 }

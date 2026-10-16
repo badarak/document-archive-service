@@ -1,13 +1,13 @@
 package com.badarak.archive.infrastructure.adapter.persistence
 
 import com.badarak.archive.domain.model.ArchivedDocument
-import com.badarak.archive.domain.model.DocumentContent
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
@@ -44,10 +44,10 @@ private fun ArchivedDocument.toEntity(): ArchivedDocumentEntity = ArchivedDocume
     businessReference = metadata.businessReference,
     description = metadata.description,
     tags = metadata.tags,
-    fileName = content.fileName,
-    contentType = content.contentType,
-    sizeBytes = content.sizeBytes,
-    objectKey = content.objectKey.value,
+    fileName = file.fileName,
+    contentType = file.contentType,
+    sizeBytes = file.sizeBytes,
+    objectKey = file.objectKey.value,
     status = status.name,
     createdAt = createdAt,
     updatedAt = updatedAt,
@@ -57,7 +57,7 @@ private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = ArchivedDocume
     id = DocumentId(id),
     owner = DocumentOwner(TenantId(tenantId), source),
     metadata = DocumentMetadata(DocumentType(documentType), businessReference, description, tags),
-    content = DocumentContent(fileName, contentType, sizeBytes, ObjectKey(objectKey)),
+    file = StoredFile(fileName, contentType, sizeBytes, ObjectKey(objectKey)),
     status = DocumentStatus.valueOf(status),
     createdAt = createdAt,
     updatedAt = updatedAt,

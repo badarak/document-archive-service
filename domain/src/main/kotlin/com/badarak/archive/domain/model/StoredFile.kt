@@ -1,7 +1,10 @@
 package com.badarak.archive.domain.model
 
-/** Binary content of a document as stored: its name and type as shown to callers, its size and its key in the object storage. */
-data class DocumentContent(val fileName: String, val contentType: String, val sizeBytes: Long, val objectKey: ObjectKey) {
+/**
+ * Description of an archived file: its name and type as shown to callers, its size and its key in the object storage.
+ * It never holds the bytes themselves.
+ */
+data class StoredFile(val fileName: String, val contentType: String, val sizeBytes: Long, val objectKey: ObjectKey) {
 
     init {
         requireText("fileName", fileName, FILE_NAME_MAX_LENGTH)

@@ -11,6 +11,16 @@ interface ObjectStorage {
      * @throws ObjectStorageException when the storage cannot be reached or refuses the content
      */
     fun store(key: ObjectKey, content: InputStream, sizeBytes: Long, contentType: String)
+
+    /**
+     * Opens the content stored under [key] as a stream, read from the storage as it is consumed. The caller must close it.
+     *
+     * @throws MissingObjectException when nothing is stored under [key]
+     * @throws ObjectStorageException when the storage cannot be reached
+     */
+    fun open(key: ObjectKey): InputStream
 }
 
 class ObjectStorageException(message: String, cause: Throwable) : RuntimeException(message, cause)
+
+class MissingObjectException(val key: ObjectKey, cause: Throwable) : RuntimeException("Nothing is stored under key '$key'", cause)

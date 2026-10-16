@@ -1,6 +1,7 @@
 package com.badarak.archive.infrastructure.adapter.storage
 
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.port.outbound.MissingObjectException
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import io.mockk.every
 import io.mockk.mockk
@@ -10,9 +11,14 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import software.amazon.awssdk.core.ResponseInputStream
 import software.amazon.awssdk.core.exception.SdkClientException
 import software.amazon.awssdk.core.sync.RequestBody
+import software.amazon.awssdk.http.AbortableInputStream
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.GetObjectRequest
+import software.amazon.awssdk.services.s3.model.GetObjectResponse
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectResponse
 import software.amazon.awssdk.services.s3.model.S3Exception
@@ -60,6 +66,41 @@ class ObjectStorageAdapterTest {
         val exception = assertThrows(ObjectStorageException::class.java) { store() }
 
         assertSame(unreachable, exception.cause)
+    }
+
+    @Test
+    fun `opens the object under the key, in the configured bucket, as a stream`() {
+        val request = slot<GetObjectRequest>()
+        val stream = ResponseInputStream(GetObjectResponse.builder().build(), AbortableInputStream.create(content.inputStream()))
+        every { s3Client.getObject(capture(request)) } returns stream
+
+        val opened = adapter.open(key)
+
+        assertEquals("archive-documents", request.captured.bucket())
+        assertEquals("documents/7d7d57e1", request.captured.key())
+        assertArrayEquals(content, opened.readAllBytes())
+    }
+
+    @Test
+    fun `a missing object becomes a missing object error`() {
+        val missing = NoSuchKeyException.builder().message("The specified key does not exist").statusCode(404).build()
+        every { s3Client.getObject(any<GetObjectRequest>()) } throws missing
+
+        val exception = assertThrows(MissingObjectException::class.java) { adapter.open(key) }
+
+        assertEquals(key, exception.key)
+        assertSame(missing, exception.cause)
+    }
+
+    @Test
+    fun `an unreachable storage becomes an object storage error when reading`() {
+        val unreachable = SdkClientException.create("Unable to execute HTTP request: Connection refused")
+        every { s3Client.getObject(any<GetObjectRequest>()) } throws unreachable
+
+        val exception = assertThrows(ObjectStorageException::class.java) { adapter.open(key) }
+
+        assertSame(unreachable, exception.cause)
+        assertEquals("Could not read object 'documents/7d7d57e1' in bucket 'archive-documents'", exception.message)
     }
 
     private fun store() = adapter.store(key, content.inputStream(), content.size.toLong(), "application/pdf")

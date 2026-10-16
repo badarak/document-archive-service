@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Encoding
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
+import org.springframework.core.io.Resource
 import org.springframework.http.MediaType
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
@@ -107,6 +108,53 @@ interface DocumentApi {
         @Parameter(hidden = true)
         jwt: Jwt,
     ): ArchivedDocumentResponse
+
+    @Operation(
+        summary = "Download the content of a document",
+        description = "Streams the original file of an AVAILABLE document of the caller's tenant, as an attachment, with its " +
+            "content type, size and file name. The access token needs the documents:read scope.",
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "The file, byte for byte",
+        content = [Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE, schema = Schema(type = "string", format = "binary"))],
+    )
+    @ApiResponse(
+        responseCode = "400",
+        description = "Identifier that is not a UUID",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "401",
+        description = "Missing, invalid or expired access token",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "403",
+        description = "Token without the documents:read scope, or without tenant or source claim",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "No available document with this identifier for the caller's tenant",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "500",
+        description = "The document's content is missing from the storage",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "503",
+        description = "Object storage or document store unavailable",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    fun download(
+        @Parameter(description = "Identifier of the document, as returned when it was archived")
+        id: UUID,
+        @Parameter(hidden = true)
+        jwt: Jwt,
+    ): ResponseEntity<Resource>
 
     companion object {
         const val PROBLEM = MediaType.APPLICATION_PROBLEM_JSON_VALUE

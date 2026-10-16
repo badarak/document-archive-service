@@ -15,7 +15,7 @@ class ArchivedDocument(
     val id: DocumentId,
     val owner: DocumentOwner,
     val metadata: DocumentMetadata,
-    val content: DocumentContent,
+    val file: StoredFile,
     val status: DocumentStatus,
     val createdAt: Instant,
     val updatedAt: Instant,
@@ -31,7 +31,7 @@ class ArchivedDocument(
 
     private fun transitionTo(target: DocumentStatus, at: Instant): ArchivedDocument {
         if (!status.canTransitionTo(target)) throw InvalidStatusTransitionException(status, target)
-        return ArchivedDocument(id, owner, metadata, content, target, createdAt, at)
+        return ArchivedDocument(id, owner, metadata, file, target, createdAt, at)
     }
 
     override fun equals(other: Any?): Boolean = other is ArchivedDocument && other.id == id
@@ -45,12 +45,12 @@ class ArchivedDocument(
             id: DocumentId,
             owner: DocumentOwner,
             metadata: DocumentMetadata,
-            content: DocumentContent,
+            file: StoredFile,
             sizePolicy: DocumentSizePolicy,
             now: Instant,
         ): ArchivedDocument {
-            sizePolicy.check(content.sizeBytes)
-            return ArchivedDocument(id, owner, metadata, content, DocumentStatus.INITIAL, now, now)
+            sizePolicy.check(file.sizeBytes)
+            return ArchivedDocument(id, owner, metadata, file, DocumentStatus.INITIAL, now, now)
         }
     }
 }

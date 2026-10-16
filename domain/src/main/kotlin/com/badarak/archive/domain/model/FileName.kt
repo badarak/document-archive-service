@@ -18,7 +18,7 @@ value class FileName private constructor(val value: String) {
     override fun toString(): String = value
 
     companion object {
-        const val MAX_LENGTH = DocumentContent.FILE_NAME_MAX_LENGTH
+        const val MAX_LENGTH = StoredFile.FILE_NAME_MAX_LENGTH
 
         fun of(raw: String): FileName {
             val name = Normalizer.normalize(raw.substringAfterLast('/').substringAfterLast('\\'), Normalizer.Form.NFC)

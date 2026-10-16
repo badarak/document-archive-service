@@ -12,6 +12,6 @@ class DownloadDocumentService(private val getDocument: GetDocumentUseCase, priva
 
     override fun download(query: DocumentQuery): DocumentDownload {
         val document = getDocument.get(query)
-        return DocumentDownload(document, storage.open(document.content.objectKey))
+        return DocumentDownload(document, storage.open(document.file.objectKey))
     }
 }

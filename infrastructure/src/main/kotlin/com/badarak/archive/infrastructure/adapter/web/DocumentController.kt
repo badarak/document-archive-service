@@ -67,11 +67,11 @@ class DocumentController(
     @GetMapping("/{id}/content")
     override fun download(@PathVariable id: UUID, @AuthenticationPrincipal jwt: Jwt): ResponseEntity<Resource> {
         val download = downloadDocument.download(DocumentQuery(callerResolver.resolve(jwt), DocumentId(id)))
-        val content = download.document.content
-        val disposition = ContentDisposition.attachment().filename(content.fileName, StandardCharsets.UTF_8).build()
+        val file = download.document.file
+        val disposition = ContentDisposition.attachment().filename(file.fileName, StandardCharsets.UTF_8).build()
         return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType(content.contentType))
-            .contentLength(content.sizeBytes)
+            .contentType(MediaType.parseMediaType(file.contentType))
+            .contentLength(file.sizeBytes)
             .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
             .body(InputStreamResource(download.content))
     }

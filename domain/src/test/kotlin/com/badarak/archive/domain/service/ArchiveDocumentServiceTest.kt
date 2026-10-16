@@ -70,7 +70,7 @@ class ArchiveDocumentServiceTest {
             assertEquals(DocumentStatus.AVAILABLE, document.status)
             assertSame(saved.last(), document)
             assertArrayEquals(content, uploaded)
-            verify { storage.store(document.content.objectKey, any(), content.size.toLong(), "application/pdf") }
+            verify { storage.store(document.file.objectKey, any(), content.size.toLong(), "application/pdf") }
         }
 
         @Test
@@ -83,8 +83,8 @@ class ArchiveDocumentServiceTest {
             assertEquals("INV-2026-000123", document.metadata.businessReference)
             assertEquals("Customer invoice", document.metadata.description)
             assertEquals(mapOf("customerId" to "CUST-456"), document.metadata.tags)
-            assertEquals(content.size.toLong(), document.content.sizeBytes)
-            assertTrue(document.content.objectKey.value.startsWith(ObjectKey.PREFIX))
+            assertEquals(content.size.toLong(), document.file.sizeBytes)
+            assertTrue(document.file.objectKey.value.startsWith(ObjectKey.PREFIX))
             assertEquals(now, document.createdAt)
             assertEquals(now, document.updatedAt)
         }
@@ -93,8 +93,8 @@ class ArchiveDocumentServiceTest {
         fun `stores the normalised file name and media type`() {
             val document = service.archive(command(fileName = "C:\\docs\\invoice.pdf", contentType = "Application/PDF; charset=binary"))
 
-            assertEquals("invoice.pdf", document.content.fileName)
-            assertEquals("application/pdf", document.content.contentType)
+            assertEquals("invoice.pdf", document.file.fileName)
+            assertEquals("application/pdf", document.file.contentType)
         }
     }
 

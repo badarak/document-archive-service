@@ -1,7 +1,6 @@
 package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
-import com.badarak.archive.domain.model.DocumentContent
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentId
@@ -9,6 +8,7 @@ import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.FileName
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
@@ -45,14 +45,14 @@ class ArchiveDocumentService(
             id = DocumentId.generate(),
             owner = DocumentOwner(command.caller.tenantId, command.caller.source),
             metadata = command.metadata,
-            content = DocumentContent(fileName.value, formatPolicy.mediaType(file.contentType), file.sizeBytes, ObjectKey.generate()),
+            file = StoredFile(fileName.value, formatPolicy.mediaType(file.contentType), file.sizeBytes, ObjectKey.generate()),
             sizePolicy = sizePolicy,
             now = clock.instant(),
         )
 
         documents.save(pending)
         try {
-            storage.store(pending.content.objectKey, stream, pending.content.sizeBytes, pending.content.contentType)
+            storage.store(pending.file.objectKey, stream, pending.file.sizeBytes, pending.file.contentType)
         } catch (e: ObjectStorageException) {
             recordFailure(pending, e)
             throw e

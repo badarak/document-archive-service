@@ -19,13 +19,13 @@ class ArchivedDocumentTest {
     private val owner = DocumentOwner(TenantId("acme"), "BILLING-SERVICE")
     private val metadata =
         DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456"))
-    private val content = DocumentContent("invoice-123.pdf", "application/pdf", 248_120, ObjectKey("documents/7d7d57e1"))
+    private val file = StoredFile("invoice-123.pdf", "application/pdf", 248_120, ObjectKey("documents/7d7d57e1"))
 
     @Nested
     inner class Creation {
 
         @Test
-        fun `a new document is pending and keeps its owner, metadata and content`() {
+        fun `a new document is pending and keeps its owner, metadata and file`() {
             val id = DocumentId.generate()
 
             val document = newDocument(id = id)
@@ -33,7 +33,7 @@ class ArchivedDocumentTest {
             assertEquals(id, document.id)
             assertSame(owner, document.owner)
             assertSame(metadata, document.metadata)
-            assertSame(content, document.content)
+            assertSame(file, document.file)
             assertEquals(DocumentStatus.PENDING, document.status)
             assertEquals(createdAt, document.createdAt)
             assertEquals(createdAt, document.updatedAt)
@@ -42,7 +42,7 @@ class ArchivedDocumentTest {
         @Test
         fun `a document above the size limit is refused`() {
             assertThrows(DocumentTooLargeException::class.java) {
-                newDocument(content = content.copy(sizeBytes = 1_001), sizePolicy = DocumentSizePolicy(maxSizeBytes = 1_000))
+                newDocument(file = file.copy(sizeBytes = 1_001), sizePolicy = DocumentSizePolicy(maxSizeBytes = 1_000))
             }
         }
     }
@@ -75,7 +75,7 @@ class ArchivedDocumentTest {
             assertEquals(pending.id, available.id)
             assertSame(pending.owner, available.owner)
             assertSame(pending.metadata, available.metadata)
-            assertSame(pending.content, available.content)
+            assertSame(pending.file, available.file)
         }
 
         @Test
@@ -139,10 +139,10 @@ class ArchivedDocumentTest {
 
     private fun newDocument(
         id: DocumentId = DocumentId.generate(),
-        content: DocumentContent = this.content,
+        file: StoredFile = this.file,
         sizePolicy: DocumentSizePolicy = DocumentSizePolicy(),
-    ): ArchivedDocument = ArchivedDocument.create(id, owner, metadata, content, sizePolicy, createdAt)
+    ): ArchivedDocument = ArchivedDocument.create(id, owner, metadata, file, sizePolicy, createdAt)
 
     private fun existingDocument(status: DocumentStatus, updatedAt: Instant = createdAt): ArchivedDocument =
-        ArchivedDocument(DocumentId.generate(), owner, metadata, content, status, createdAt, updatedAt)
+        ArchivedDocument(DocumentId.generate(), owner, metadata, file, status, createdAt, updatedAt)
 }

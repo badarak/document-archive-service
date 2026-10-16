@@ -3,7 +3,6 @@ package com.badarak.archive.infrastructure.adapter.web
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.ContentMismatchException
 import com.badarak.archive.domain.model.ContentTypeMismatchException
-import com.badarak.archive.domain.model.DocumentContent
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
@@ -17,6 +16,7 @@ import com.badarak.archive.domain.model.EmptyDocumentException
 import com.badarak.archive.domain.model.InvalidDocumentException
 import com.badarak.archive.domain.model.InvalidStatusTransitionException
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
@@ -299,7 +299,7 @@ class DocumentControllerIT {
             id = DocumentId.parse(ID),
             owner = DocumentOwner(TenantId("acme"), "billing-service"),
             metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
-            content = DocumentContent(fileName, "application/pdf", content.size.toLong(), ObjectKey.generate()),
+            file = StoredFile(fileName, "application/pdf", content.size.toLong(), ObjectKey.generate()),
             status = DocumentStatus.AVAILABLE,
             createdAt = Instant.parse("2026-10-15T09:15:00Z"),
             updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
@@ -393,7 +393,7 @@ class DocumentControllerIT {
         id = DocumentId.parse(ID),
         owner = DocumentOwner(TenantId("acme"), "billing-service"),
         metadata = metadata,
-        content = DocumentContent("invoice-123.pdf", "application/pdf", content.size.toLong(), ObjectKey.generate()),
+        file = StoredFile("invoice-123.pdf", "application/pdf", content.size.toLong(), ObjectKey.generate()),
         sizePolicy = DocumentSizePolicy(),
         now = Instant.parse("2026-10-15T09:15:00Z"),
     ).markAvailable(Instant.parse("2026-10-15T09:15:00Z"))

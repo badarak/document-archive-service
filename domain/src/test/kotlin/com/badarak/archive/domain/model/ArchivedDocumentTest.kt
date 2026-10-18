@@ -3,6 +3,7 @@ package com.badarak.archive.domain.model
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Nested
@@ -58,6 +59,25 @@ class ArchivedDocumentTest {
 
             assertEquals("updatedAt", exception.field)
         }
+
+        @Test
+        fun `a deleted document must have a deletion date`() {
+            val exception = assertThrows(InvalidDocumentException::class.java) {
+                ArchivedDocument(DocumentId.generate(), owner, metadata, file, DocumentStatus.DELETED, createdAt, later)
+            }
+
+            assertEquals("deletedAt", exception.field)
+        }
+
+        @ParameterizedTest
+        @EnumSource(DocumentStatus::class, names = ["DELETED"], mode = EnumSource.Mode.EXCLUDE)
+        fun `a document that is not deleted has no deletion date`(status: DocumentStatus) {
+            val exception = assertThrows(InvalidDocumentException::class.java) {
+                ArchivedDocument(DocumentId.generate(), owner, metadata, file, status, createdAt, later, deletedAt = later)
+            }
+
+            assertEquals("deletedAt", exception.field)
+        }
     }
 
     @Nested
@@ -96,9 +116,44 @@ class ArchivedDocumentTest {
             assertEquals(createdAt, pending.updatedAt)
         }
 
+        @Test
+        fun `an available document is deleted in two steps, and only the last one dates the deletion`() {
+            val evenLater = later.plusSeconds(1)
+            val available = existingDocument(status = DocumentStatus.AVAILABLE)
+
+            val deleting = available.markDeleting(later)
+            val deleted = deleting.markDeleted(evenLater)
+
+            assertEquals(DocumentStatus.DELETING, deleting.status)
+            assertEquals(later, deleting.updatedAt)
+            assertNull(deleting.deletedAt)
+            assertEquals(DocumentStatus.DELETED, deleted.status)
+            assertEquals(evenLater, deleted.updatedAt)
+            assertEquals(evenLater, deleted.deletedAt)
+            assertSame(available.file, deleted.file)
+        }
+
         @ParameterizedTest
-        @EnumSource(DocumentStatus::class, names = ["AVAILABLE", "FAILED"])
-        fun `a document in a terminal status cannot change status`(status: DocumentStatus) {
+        @EnumSource(DocumentStatus::class, names = ["AVAILABLE"], mode = EnumSource.Mode.EXCLUDE)
+        fun `only an available document can start being deleted`(status: DocumentStatus) {
+            val exception = assertThrows(InvalidStatusTransitionException::class.java) { existingDocument(status).markDeleting(later) }
+
+            assertEquals(status, exception.from)
+            assertEquals(DocumentStatus.DELETING, exception.to)
+        }
+
+        @ParameterizedTest
+        @EnumSource(DocumentStatus::class, names = ["DELETING"], mode = EnumSource.Mode.EXCLUDE)
+        fun `only a document being deleted can become deleted`(status: DocumentStatus) {
+            val exception = assertThrows(InvalidStatusTransitionException::class.java) { existingDocument(status).markDeleted(later) }
+
+            assertEquals(status, exception.from)
+            assertEquals(DocumentStatus.DELETED, exception.to)
+        }
+
+        @ParameterizedTest
+        @EnumSource(DocumentStatus::class, names = ["PENDING"], mode = EnumSource.Mode.EXCLUDE)
+        fun `a document that is no longer pending cannot become available or failed`(status: DocumentStatus) {
             val document = existingDocument(status = status)
 
             val toAvailable = assertThrows(InvalidStatusTransitionException::class.java) { document.markAvailable(later) }
@@ -143,6 +198,14 @@ class ArchivedDocumentTest {
         sizePolicy: DocumentSizePolicy = DocumentSizePolicy(),
     ): ArchivedDocument = ArchivedDocument.create(id, owner, metadata, file, sizePolicy, createdAt)
 
-    private fun existingDocument(status: DocumentStatus, updatedAt: Instant = createdAt): ArchivedDocument =
-        ArchivedDocument(DocumentId.generate(), owner, metadata, file, status, createdAt, updatedAt)
+    private fun existingDocument(status: DocumentStatus, updatedAt: Instant = createdAt): ArchivedDocument = ArchivedDocument(
+        DocumentId.generate(),
+        owner,
+        metadata,
+        file,
+        status,
+        createdAt,
+        updatedAt,
+        deletedAt = updatedAt.takeIf { status == DocumentStatus.DELETED },
+    )
 }

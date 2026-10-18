@@ -64,5 +64,6 @@ class GetDocumentServiceTest {
         status = status,
         createdAt = Instant.parse("2026-10-15T09:15:00Z"),
         updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+        deletedAt = Instant.parse("2026-10-15T09:15:00Z").takeIf { status == DocumentStatus.DELETED },
     )
 }

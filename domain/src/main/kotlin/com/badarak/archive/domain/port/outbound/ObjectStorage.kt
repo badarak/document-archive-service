@@ -19,6 +19,14 @@ interface ObjectStorage {
      * @throws ObjectStorageException when the storage cannot be reached
      */
     fun open(key: ObjectKey): InputStream
+
+    /**
+     * Removes the content stored under [key]. Removing a key under which nothing is stored succeeds, so that an interrupted
+     * deletion can be replayed.
+     *
+     * @throws ObjectStorageException when the storage cannot be reached or refuses the deletion
+     */
+    fun delete(key: ObjectKey)
 }
 
 class ObjectStorageException(message: String, cause: Throwable) : RuntimeException(message, cause)

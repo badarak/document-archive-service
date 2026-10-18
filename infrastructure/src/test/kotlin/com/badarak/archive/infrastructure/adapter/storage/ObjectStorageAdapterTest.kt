@@ -16,6 +16,8 @@ import software.amazon.awssdk.core.exception.SdkClientException
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.http.AbortableInputStream
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
+import software.amazon.awssdk.services.s3.model.DeleteObjectResponse
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectResponse
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
@@ -101,6 +103,28 @@ class ObjectStorageAdapterTest {
 
         assertSame(unreachable, exception.cause)
         assertEquals("Could not read object 'documents/7d7d57e1' in bucket 'archive-documents'", exception.message)
+    }
+
+    @Test
+    fun `deletes the object under the key, in the configured bucket`() {
+        val request = slot<DeleteObjectRequest>()
+        every { s3Client.deleteObject(capture(request)) } returns DeleteObjectResponse.builder().build()
+
+        adapter.delete(key)
+
+        assertEquals("archive-documents", request.captured.bucket())
+        assertEquals("documents/7d7d57e1", request.captured.key())
+    }
+
+    @Test
+    fun `an unreachable storage becomes an object storage error when deleting`() {
+        val unreachable = SdkClientException.create("Unable to execute HTTP request: Connection refused")
+        every { s3Client.deleteObject(any<DeleteObjectRequest>()) } throws unreachable
+
+        val exception = assertThrows(ObjectStorageException::class.java) { adapter.delete(key) }
+
+        assertSame(unreachable, exception.cause)
+        assertEquals("Could not delete object 'documents/7d7d57e1' in bucket 'archive-documents'", exception.message)
     }
 
     private fun store() = adapter.store(key, content.inputStream(), content.size.toLong(), "application/pdf")

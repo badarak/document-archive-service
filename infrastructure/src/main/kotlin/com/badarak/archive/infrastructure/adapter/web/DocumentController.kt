@@ -6,6 +6,7 @@ import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.inbound.DeleteDocumentUseCase
 import com.badarak.archive.domain.port.inbound.DocumentQuery
 import com.badarak.archive.domain.port.inbound.DocumentSearchQuery
 import com.badarak.archive.domain.port.inbound.DownloadDocumentUseCase
@@ -22,6 +23,7 @@ import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -44,6 +46,7 @@ class DocumentController(
     private val getDocument: GetDocumentUseCase,
     private val downloadDocument: DownloadDocumentUseCase,
     private val searchDocuments: SearchDocumentsUseCase,
+    private val deleteDocument: DeleteDocumentUseCase,
     private val callerResolver: JwtCallerResolver,
 ) : DocumentApi {
 
@@ -99,5 +102,11 @@ class DocumentController(
             .contentLength(file.sizeBytes)
             .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
             .body(InputStreamResource(download.content))
+    }
+
+    @DeleteMapping("/{id}")
+    override fun delete(@PathVariable id: UUID, @AuthenticationPrincipal jwt: Jwt): ResponseEntity<Void> {
+        deleteDocument.delete(DocumentQuery(callerResolver.resolve(jwt), DocumentId(id)))
+        return ResponseEntity.noContent().build()
     }
 }

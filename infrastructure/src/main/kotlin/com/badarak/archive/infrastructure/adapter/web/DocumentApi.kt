@@ -203,6 +203,46 @@ interface DocumentApi {
         jwt: Jwt,
     ): ResponseEntity<Resource>
 
+    @Operation(
+        summary = "Delete a document",
+        description = "Removes the content of an AVAILABLE document of the caller's tenant from the storage and records it as " +
+            "deleted, keeping its metadata. The access token needs the documents:write scope. The document can no longer be " +
+            "read as soon as the deletion starts. Deleting a deleted document succeeds again, and replaying a deletion " +
+            "interrupted by a storage failure finishes it.",
+    )
+    @ApiResponse(responseCode = "204", description = "Document deleted")
+    @ApiResponse(
+        responseCode = "400",
+        description = "Identifier that is not a UUID",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "401",
+        description = "Missing, invalid or expired access token",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "403",
+        description = "Token without the documents:write scope, or without tenant or source claim",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "No available or deleted document with this identifier for the caller's tenant",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    @ApiResponse(
+        responseCode = "503",
+        description = "Object storage or document store unavailable; the document stays unreadable and the deletion can be replayed",
+        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
+    )
+    fun delete(
+        @Parameter(description = "Identifier of the document, as returned when it was archived")
+        id: UUID,
+        @Parameter(hidden = true)
+        jwt: Jwt,
+    ): ResponseEntity<Void>
+
     companion object {
         const val PROBLEM = MediaType.APPLICATION_PROBLEM_JSON_VALUE
     }

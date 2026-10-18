@@ -83,6 +83,7 @@ private fun ArchivedDocument.toEntity(): ArchivedDocumentEntity = ArchivedDocume
     status = status.name,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    deletedAt = deletedAt,
 )
 
 private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = ArchivedDocument(
@@ -93,4 +94,5 @@ private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = ArchivedDocume
     status = DocumentStatus.valueOf(status),
     createdAt = createdAt,
     updatedAt = updatedAt,
+    deletedAt = deletedAt,
 )

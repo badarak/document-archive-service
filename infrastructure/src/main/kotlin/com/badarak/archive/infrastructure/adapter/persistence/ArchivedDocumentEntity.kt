@@ -42,4 +42,6 @@ class ArchivedDocumentEntity(
     val createdAt: Instant,
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant,
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null,
 )

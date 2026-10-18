@@ -34,6 +34,7 @@ class DocumentRepositoryAdapterIT {
 
     private val createdAt = Instant.parse("2026-10-14T09:15:00.123456Z")
     private val later = Instant.parse("2026-10-14T09:15:05.654321Z")
+    private val deletedAt = Instant.parse("2026-10-16T10:00:00.000001Z")
 
     @AfterEach
     fun deleteDocuments() {
@@ -60,6 +61,7 @@ class DocumentRepositoryAdapterIT {
         assertEquals("PENDING", stored.status)
         assertEquals(createdAt, stored.createdAt)
         assertEquals(createdAt, stored.updatedAt)
+        assertNull(stored.deletedAt)
     }
 
     @Test
@@ -93,6 +95,18 @@ class DocumentRepositoryAdapterIT {
         assertEquals(DocumentStatus.AVAILABLE, found.status)
         assertEquals(createdAt, found.createdAt)
         assertEquals(later, found.updatedAt)
+    }
+
+    @Test
+    fun `a deleted document is stored and read back with its deletion date`() {
+        val deleted = pendingDocument().markAvailable(later).markDeleting(later).markDeleted(deletedAt)
+        adapter.save(deleted)
+
+        val found = adapter.findByIdAndTenant(deleted.id, TenantId("acme"))!!
+
+        assertEquals(DocumentStatus.DELETED, found.status)
+        assertEquals(deletedAt, found.deletedAt)
+        assertEquals(deletedAt, repository.findById(deleted.id.value).orElseThrow().deletedAt)
     }
 
     @Test

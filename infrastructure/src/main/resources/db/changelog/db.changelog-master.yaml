@@ -35,3 +35,14 @@ databaseChangeLog:
         - sqlFile:
             path: sql/003-add-search-indexes-to-archived-document.rollback.sql
             relativeToChangelogFile: true
+  - changeSet:
+      id: 004-add-deletion-to-archived-document
+      author: badarak
+      changes:
+        - sqlFile:
+            path: sql/004-add-deletion-to-archived-document.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sqlFile:
+            path: sql/004-add-deletion-to-archived-document.rollback.sql
+            relativeToChangelogFile: true

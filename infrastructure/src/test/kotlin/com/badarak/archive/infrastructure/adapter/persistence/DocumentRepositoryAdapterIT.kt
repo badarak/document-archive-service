@@ -4,15 +4,18 @@ import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
+import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -104,6 +107,88 @@ class DocumentRepositoryAdapterIT {
     fun `an unknown document is not found`() {
         assertNull(adapter.findByIdAndTenant(DocumentId.generate(), TenantId("acme")))
     }
+
+    @Test
+    fun `a search returns only the documents of the tenant in the requested status`() {
+        val expected = stored()
+        stored(tenant = "globex")
+        stored(status = DocumentStatus.PENDING)
+
+        val page = adapter.search(TenantId("acme"), DocumentStatus.AVAILABLE, DocumentSearchCriteria(), PageRequest())
+
+        assertEquals(listOf(expected.id), page.documents.map { it.id })
+        assertEquals(1, page.totalElements)
+        assertEquals(expected.file, page.documents.single().file)
+    }
+
+    @Test
+    fun `a search filters on the document type, the source and the business reference`() {
+        val expected = stored(type = "CONTRACT", source = "sales-service", reference = "CTR-1")
+        stored(type = "INVOICE", source = "sales-service", reference = "CTR-1")
+        stored(type = "CONTRACT", source = "billing-service", reference = "CTR-1")
+        stored(type = "CONTRACT", source = "sales-service", reference = "CTR-2")
+        val criteria = DocumentSearchCriteria(DocumentType("CONTRACT"), "sales-service", "CTR-1")
+
+        val page = adapter.search(TenantId("acme"), DocumentStatus.AVAILABLE, criteria, PageRequest())
+
+        assertEquals(listOf(expected.id), page.documents.map { it.id })
+    }
+
+    @Test
+    fun `a search includes the documents created on both bounds of the period`() {
+        stored(createdAt = createdAt.minusNanos(1_000))
+        val first = stored(createdAt = createdAt)
+        val last = stored(createdAt = later)
+        stored(createdAt = later.plusNanos(1_000))
+        val criteria = DocumentSearchCriteria(createdFrom = createdAt, createdTo = later)
+
+        val page = adapter.search(TenantId("acme"), DocumentStatus.AVAILABLE, criteria, PageRequest())
+
+        assertEquals(listOf(last.id, first.id), page.documents.map { it.id })
+    }
+
+    @Test
+    fun `a search returns the newest documents first, then orders by descending identifier`() {
+        val oldest = stored(createdAt = createdAt)
+        val sameInstant = List(3) { stored(createdAt = later) }
+
+        val page = adapter.search(TenantId("acme"), DocumentStatus.AVAILABLE, DocumentSearchCriteria(), PageRequest())
+
+        val expected = sameInstant.sortedByDescending { it.id.value.toString() }.map { it.id } + oldest.id
+        assertEquals(expected, page.documents.map { it.id })
+    }
+
+    @Test
+    fun `a search returns the requested page and the number of matching documents`() {
+        val documents = List(5) { stored(createdAt = createdAt.plusSeconds(it.toLong())) }.reversed()
+
+        val second = adapter.search(TenantId("acme"), DocumentStatus.AVAILABLE, DocumentSearchCriteria(), PageRequest(1, 2))
+        val beyond = adapter.search(TenantId("acme"), DocumentStatus.AVAILABLE, DocumentSearchCriteria(), PageRequest(3, 2))
+
+        assertEquals(documents.subList(2, 4).map { it.id }, second.documents.map { it.id })
+        assertEquals(5, second.totalElements)
+        assertEquals(3, second.totalPages)
+        assertEquals(PageRequest(1, 2), second.request)
+        assertTrue(beyond.documents.isEmpty())
+        assertEquals(5, beyond.totalElements)
+    }
+
+    private fun stored(
+        tenant: String = "acme",
+        status: DocumentStatus = DocumentStatus.AVAILABLE,
+        type: String = "INVOICE",
+        source: String = "billing-service",
+        reference: String = "INV-1",
+        createdAt: Instant = this.createdAt,
+    ): ArchivedDocument = ArchivedDocument(
+        id = DocumentId.generate(),
+        owner = DocumentOwner(TenantId(tenant), source),
+        metadata = DocumentMetadata(DocumentType(type), reference, null, emptyMap()),
+        file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
+        status = status,
+        createdAt = createdAt,
+        updatedAt = createdAt,
+    ).also { adapter.save(it) }
 
     private fun pendingDocument(): ArchivedDocument = ArchivedDocument.create(
         id = DocumentId.generate(),

@@ -18,7 +18,6 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
@@ -151,13 +150,10 @@ class ApiSecurityIT {
         header(HttpHeaders.AUTHORIZATION, "Bearer $token")
     }
 
-    /** Stands in for the search and delete endpoints of the document API, which do not exist yet. */
+    /** Stands in for the delete endpoint of the document API, which does not exist yet. */
     @RestController
     @RequestMapping(DOCUMENTS)
     class DocumentsStubController {
-
-        @GetMapping
-        fun search(): String = "found"
 
         @DeleteMapping("/{id}")
         fun delete(): String = "deleted"

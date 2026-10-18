@@ -1,0 +1,3 @@
+DROP INDEX archive.idx_archived_document_tenant_type_created;
+
+DROP INDEX archive.idx_archived_document_tenant_created;

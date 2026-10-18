@@ -4,15 +4,22 @@ import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
+import com.badarak.archive.domain.model.DocumentPage
+import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import org.springframework.dao.DataAccessException
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Repository
+import java.time.Instant
+import org.springframework.data.domain.PageRequest as SpringPageRequest
 
 /**
  * Each call runs in its own transaction, the one Spring Data opens around it. Documents are rebuilt through their
@@ -34,7 +41,32 @@ class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocume
     } catch (e: DataAccessException) {
         throw DocumentPersistenceException("Could not read document $id", e)
     }
+
+    override fun search(tenantId: TenantId, status: DocumentStatus, criteria: DocumentSearchCriteria, page: PageRequest): DocumentPage =
+        try {
+            val result = repository.findAll(matching(tenantId, status, criteria), SpringPageRequest.of(page.page, page.size, NEWEST_FIRST))
+            DocumentPage(result.content.map { it.toDomain() }, page, result.totalElements)
+        } catch (e: DataAccessException) {
+            throw DocumentPersistenceException("Could not search the documents of tenant $tenantId", e)
+        }
 }
+
+private val NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt", "id")
+
+private fun matching(tenantId: TenantId, status: DocumentStatus, criteria: DocumentSearchCriteria) =
+    Specification<ArchivedDocumentEntity> { root, _, builder ->
+        builder.and(
+            *listOfNotNull(
+                builder.equal(root.get<String>("tenantId"), tenantId.value),
+                builder.equal(root.get<String>("status"), status.name),
+                criteria.documentType?.let { builder.equal(root.get<String>("documentType"), it.value) },
+                criteria.source?.let { builder.equal(root.get<String>("source"), it) },
+                criteria.businessReference?.let { builder.equal(root.get<String>("businessReference"), it) },
+                criteria.createdFrom?.let { builder.greaterThanOrEqualTo(root.get<Instant>("createdAt"), it) },
+                criteria.createdTo?.let { builder.lessThanOrEqualTo(root.get<Instant>("createdAt"), it) },
+            ).toTypedArray(),
+        )
+    }
 
 private fun ArchivedDocument.toEntity(): ArchivedDocumentEntity = ArchivedDocumentEntity(
     id = id.value,

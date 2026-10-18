@@ -46,6 +46,8 @@ class ArchivedDocumentSchemaIT {
                 "pk_archived_document",
                 "uk_archived_document_object_key",
                 "ck_archived_document_size_bytes",
+                "ck_archived_document_status",
+                "ck_archived_document_deleted_at",
             ),
             constraints.toSet(),
         )
@@ -71,7 +73,7 @@ class ArchivedDocumentSchemaIT {
     fun `running liquibase again does not replay applied changesets`() {
         liquibase.afterPropertiesSet()
 
-        assertEquals(3, appliedChangeSetCount())
+        assertEquals(4, appliedChangeSetCount())
     }
 
     @Test
@@ -125,17 +127,39 @@ class ArchivedDocumentSchemaIT {
         assertThrows(DataIntegrityViolationException::class.java) { insertRow(tenantId = null) }
     }
 
-    private fun insertRow(tenantId: String? = "acme", sizeBytes: Long = 1) {
+    @Test
+    fun `the database refuses an unknown status`() {
+        assertThrows(DataIntegrityViolationException::class.java) { insertRow(status = "ARCHIVED") }
+    }
+
+    @Test
+    fun `the database refuses a deleted document without deletion date`() {
+        assertThrows(DataIntegrityViolationException::class.java) { insertRow(status = "DELETED") }
+    }
+
+    @Test
+    fun `the database refuses a deletion date on a document that is not deleted`() {
+        assertThrows(DataIntegrityViolationException::class.java) { insertRow(status = "DELETING", deletedAt = OffsetDateTime.now()) }
+    }
+
+    @Test
+    fun `the database accepts a deleted document with its deletion date`() {
+        insertRow(status = "DELETED", deletedAt = OffsetDateTime.now())
+    }
+
+    private fun insertRow(tenantId: String? = "acme", sizeBytes: Long = 1, status: String = "PENDING", deletedAt: OffsetDateTime? = null) {
         jdbcTemplate.update(
             "INSERT INTO archive.archived_document (id, tenant_id, document_type, source, tags, file_name, content_type, " +
-                "size_bytes, object_key, status, created_at, updated_at) " +
-                "VALUES (?, ?, 'INVOICE', 'BILLING-SERVICE', '{}', 'invoice.pdf', 'application/pdf', ?, ?, 'PENDING', ?, ?)",
+                "size_bytes, object_key, status, created_at, updated_at, deleted_at) " +
+                "VALUES (?, ?, 'INVOICE', 'BILLING-SERVICE', '{}', 'invoice.pdf', 'application/pdf', ?, ?, ?, ?, ?, ?)",
             UUID.randomUUID(),
             tenantId,
             sizeBytes,
             "documents/${UUID.randomUUID()}",
+            status,
             OffsetDateTime.now(),
             OffsetDateTime.now(),
+            deletedAt,
         )
     }
 

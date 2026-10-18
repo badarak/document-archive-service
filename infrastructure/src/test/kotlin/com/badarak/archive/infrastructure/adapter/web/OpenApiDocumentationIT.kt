@@ -32,6 +32,8 @@ class OpenApiDocumentationIT {
             jsonPath("$.paths['/api/v1/documents'].post.responses['415']") { exists() }
             jsonPath("$.paths['/api/v1/documents'].get.summary") { value("Search the documents") }
             jsonPath("$.paths['/api/v1/documents'].get.parameters[?(@.name == 'size')].schema.maximum") { value(100) }
+            jsonPath("$.paths['/api/v1/documents/{id}'].delete.summary") { value("Delete a document") }
+            jsonPath("$.paths['/api/v1/documents/{id}'].delete.responses['204']") { exists() }
             jsonPath("$.components.securitySchemes['bearer-jwt'].scheme") { value("bearer") }
         }
     }

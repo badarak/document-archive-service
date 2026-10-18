@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
@@ -17,16 +16,12 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
-import org.springframework.web.bind.annotation.DeleteMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(ApiSecurityIT.DocumentsStubController::class)
 class ApiSecurityIT {
 
     @Autowired
@@ -126,8 +121,10 @@ class ApiSecurityIT {
 
     @Test
     fun `deleting a document requires the write scope`() {
-        mockMvc.delete("$DOCUMENTS/42") { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isForbidden() } }
-        mockMvc.delete("$DOCUMENTS/42") { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isOk() } }
+        val document = "$DOCUMENTS/${UUID.randomUUID()}"
+
+        mockMvc.delete(document) { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isForbidden() } }
+        mockMvc.delete(document) { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isNotFound() } }
     }
 
     @Test
@@ -148,15 +145,6 @@ class ApiSecurityIT {
 
     private fun MockHttpServletRequestDsl.bearer(token: String) {
         header(HttpHeaders.AUTHORIZATION, "Bearer $token")
-    }
-
-    /** Stands in for the delete endpoint of the document API, which does not exist yet. */
-    @RestController
-    @RequestMapping(DOCUMENTS)
-    class DocumentsStubController {
-
-        @DeleteMapping("/{id}")
-        fun delete(): String = "deleted"
     }
 
     companion object {

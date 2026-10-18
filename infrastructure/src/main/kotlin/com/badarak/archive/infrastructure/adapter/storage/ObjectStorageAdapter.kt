@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component
 import software.amazon.awssdk.core.exception.SdkException
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
@@ -15,7 +16,8 @@ import java.io.InputStream
 
 /**
  * Uploads each document in a single PutObject request: documents are small enough to need no multipart upload. Reads
- * stream the object from the storage, without loading it in memory.
+ * stream the object from the storage, without loading it in memory. DeleteObject succeeds on a missing key with S3, MinIO
+ * and Cloudflare R2, which makes deletions replayable.
  */
 @Component
 class ObjectStorageAdapter(private val s3Client: S3Client, private val properties: S3StorageProperties) : ObjectStorage {
@@ -42,6 +44,15 @@ class ObjectStorageAdapter(private val s3Client: S3Client, private val propertie
             throw MissingObjectException(key, e)
         } catch (e: SdkException) {
             throw ObjectStorageException("Could not read object '$key' in bucket '${properties.bucket}'", e)
+        }
+    }
+
+    override fun delete(key: ObjectKey) {
+        val request = DeleteObjectRequest.builder().bucket(properties.bucket).key(key.value).build()
+        try {
+            s3Client.deleteObject(request)
+        } catch (e: SdkException) {
+            throw ObjectStorageException("Could not delete object '$key' in bucket '${properties.bucket}'", e)
         }
     }
 }

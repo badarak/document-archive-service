@@ -24,6 +24,7 @@ import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.inbound.DeleteDocumentUseCase
 import com.badarak.archive.domain.port.inbound.DocumentDownload
 import com.badarak.archive.domain.port.inbound.DocumentQuery
 import com.badarak.archive.domain.port.inbound.DocumentSearchQuery
@@ -36,7 +37,9 @@ import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import io.mockk.clearMocks
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.runs
 import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -64,6 +67,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
 import java.io.ByteArrayInputStream
@@ -90,13 +94,16 @@ class DocumentControllerIT {
     @Autowired
     private lateinit var searchDocuments: SearchDocumentsUseCase
 
+    @Autowired
+    private lateinit var deleteDocument: DeleteDocumentUseCase
+
     private val content = "%PDF-1.7\n%âãÏÓ".toByteArray()
     private var received: ArchiveDocumentCommand? = null
     private var receivedBytes: ByteArray? = null
 
     @BeforeEach
     fun acceptEveryDocument() {
-        clearMocks(useCase, getDocument, downloadDocument, searchDocuments)
+        clearMocks(useCase, getDocument, downloadDocument, searchDocuments, deleteDocument)
         every { useCase.archive(any()) } answers {
             val command = firstArg<ArchiveDocumentCommand>()
             received = command
@@ -452,6 +459,70 @@ class DocumentControllerIT {
     }
 
     @Nested
+    inner class Deletion {
+
+        private val query = slot<DocumentQuery>()
+
+        @Test
+        fun `a deleted document is answered with 204 and no body`() {
+            every { deleteDocument.delete(capture(query)) } just runs
+
+            delete().andExpect {
+                status { isNoContent() }
+                content { string("") }
+            }
+
+            assertEquals(DocumentId.parse(ID), query.captured.id)
+            assertEquals(TenantId("acme"), query.captured.caller.tenantId)
+        }
+
+        @Test
+        fun `a document that is not found is answered with 404`() {
+            every { deleteDocument.delete(any()) } throws DocumentNotFoundException(DocumentId.parse(ID))
+
+            delete().andExpect {
+                status { isNotFound() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.code") { value("document-not-found") }
+            }
+        }
+
+        @Test
+        fun `an unreachable storage is answered with 503, without internal details`() {
+            every { deleteDocument.delete(any()) } throws ObjectStorageException("Bucket 'secret' unreachable", RuntimeException())
+
+            delete().andExpect {
+                status { isServiceUnavailable() }
+                jsonPath("$.code") { value("archive-unavailable") }
+                jsonPath("$.detail") { value("The archive is temporarily unavailable, retry later") }
+            }
+        }
+
+        @Test
+        fun `an identifier that is not a UUID is refused with 400`() {
+            mockMvc.delete("$DOCUMENTS/not-a-uuid") { header(HttpHeaders.AUTHORIZATION, "Bearer ${token()}") }.andExpect {
+                status { isBadRequest() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+            }
+
+            verify(exactly = 0) { deleteDocument.delete(any()) }
+        }
+
+        @Test
+        fun `a token without tenant is refused with 403`() {
+            delete(TestAuthorizationServer.token(scope = "documents:write", tenant = null)).andExpect {
+                status { isForbidden() }
+                jsonPath("$.code") { value("caller-not-identified") }
+            }
+
+            verify(exactly = 0) { deleteDocument.delete(any()) }
+        }
+
+        private fun delete(token: String = token()): ResultActionsDsl =
+            mockMvc.delete("$DOCUMENTS/$ID") { header(HttpHeaders.AUTHORIZATION, "Bearer $token") }
+    }
+
+    @Nested
     inner class Errors {
 
         @ParameterizedTest(name = "{1} {2}")
@@ -559,6 +630,10 @@ class DocumentControllerIT {
         @Bean
         @Primary
         fun searchDocumentsUseCaseStub(): SearchDocumentsUseCase = mockk()
+
+        @Bean
+        @Primary
+        fun deleteDocumentUseCaseStub(): DeleteDocumentUseCase = mockk()
     }
 
     companion object {

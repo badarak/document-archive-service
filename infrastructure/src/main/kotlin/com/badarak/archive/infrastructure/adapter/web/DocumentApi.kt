@@ -206,7 +206,7 @@ interface DocumentApi {
     @Operation(
         summary = "Delete a document",
         description = "Removes the content of an AVAILABLE document of the caller's tenant from the storage and records it as " +
-            "deleted, keeping its metadata. The access token needs the documents:write scope. The document can no longer be " +
+            "deleted, keeping its metadata. The access token needs the documents:delete scope. The document can no longer be " +
             "read as soon as the deletion starts. Deleting a deleted document succeeds again, and replaying a deletion " +
             "interrupted by a storage failure finishes it.",
     )
@@ -223,7 +223,7 @@ interface DocumentApi {
     )
     @ApiResponse(
         responseCode = "403",
-        description = "Token without the documents:write scope, or without tenant or source claim",
+        description = "Token without the documents:delete scope, or without tenant or source claim",
         content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
     )
     @ApiResponse(

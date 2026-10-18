@@ -27,7 +27,8 @@ class SecurityConfiguration {
                 authorize("/swagger-ui.html", permitAll)
                 authorize("/swagger-ui/**", permitAll)
                 authorize(HttpMethod.GET, DOCUMENTS, hasAuthority(READ_DOCUMENTS))
-                authorize(DOCUMENTS, hasAuthority(WRITE_DOCUMENTS))
+                authorize(HttpMethod.POST, DOCUMENT_COLLECTION, hasAuthority(WRITE_DOCUMENTS))
+                authorize(HttpMethod.DELETE, DOCUMENT, hasAuthority(DELETE_DOCUMENTS))
                 authorize(anyRequest, denyAll)
             }
             oauth2ResourceServer {
@@ -44,8 +45,11 @@ class SecurityConfiguration {
     }
 
     companion object {
-        private const val DOCUMENTS = "/api/v1/documents/**"
+        private const val DOCUMENT_COLLECTION = "/api/v1/documents"
+        private const val DOCUMENT = "$DOCUMENT_COLLECTION/*"
+        private const val DOCUMENTS = "$DOCUMENT_COLLECTION/**"
         private const val READ_DOCUMENTS = "SCOPE_documents:read"
         private const val WRITE_DOCUMENTS = "SCOPE_documents:write"
+        private const val DELETE_DOCUMENTS = "SCOPE_documents:delete"
     }
 }

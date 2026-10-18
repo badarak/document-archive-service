@@ -500,7 +500,7 @@ class DocumentControllerIT {
 
         @Test
         fun `an identifier that is not a UUID is refused with 400`() {
-            mockMvc.delete("$DOCUMENTS/not-a-uuid") { header(HttpHeaders.AUTHORIZATION, "Bearer ${token()}") }.andExpect {
+            mockMvc.delete("$DOCUMENTS/not-a-uuid") { header(HttpHeaders.AUTHORIZATION, "Bearer ${deleteToken()}") }.andExpect {
                 status { isBadRequest() }
                 content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
             }
@@ -510,7 +510,7 @@ class DocumentControllerIT {
 
         @Test
         fun `a token without tenant is refused with 403`() {
-            delete(TestAuthorizationServer.token(scope = "documents:write", tenant = null)).andExpect {
+            delete(TestAuthorizationServer.token(scope = "documents:delete", tenant = null)).andExpect {
                 status { isForbidden() }
                 jsonPath("$.code") { value("caller-not-identified") }
             }
@@ -518,8 +518,10 @@ class DocumentControllerIT {
             verify(exactly = 0) { deleteDocument.delete(any()) }
         }
 
-        private fun delete(token: String = token()): ResultActionsDsl =
+        private fun delete(token: String = deleteToken()): ResultActionsDsl =
             mockMvc.delete("$DOCUMENTS/$ID") { header(HttpHeaders.AUTHORIZATION, "Bearer $token") }
+
+        private fun deleteToken() = TestAuthorizationServer.token(scope = "documents:delete")
     }
 
     @Nested

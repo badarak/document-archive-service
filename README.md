@@ -111,9 +111,10 @@ The service is an OAuth2 resource server: callers authenticate with a JWT access
 | `/actuator/health` and its probes | None, so monitoring can call them |
 | `/.well-known/oauth-protected-resource` | None; standard metadata published by Spring Security (the service URL and the bearer method) |
 | `/v3/api-docs` and `/swagger-ui/**` | None; the OpenAPI description of the API |
-| `GET /api/v1/documents/**` | Valid token with the `documents:read` scope |
-| Other methods on `/api/v1/documents/**` | Valid token with the `documents:write` scope |
-| Anything else | Denied, even with a valid token |
+| `GET /api/v1/documents/**` (read, search, download) | Valid token with the `documents:read` scope |
+| `POST /api/v1/documents` (archive) | Valid token with the `documents:write` scope |
+| `DELETE /api/v1/documents/{id}` (delete) | Valid token with the `documents:delete` scope |
+| Anything else, including other methods on the document API | Denied, even with a valid token |
 
 The authorization server signs each token with its private key, which it never shares. It publishes
 the matching public keys at `ARCHIVE_JWT_JWKS_URI`; the service downloads them to verify the

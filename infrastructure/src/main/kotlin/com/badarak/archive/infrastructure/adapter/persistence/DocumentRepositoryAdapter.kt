@@ -23,7 +23,8 @@ import org.springframework.data.domain.PageRequest as SpringPageRequest
 
 /**
  * Each call runs in its own transaction, the one Spring Data opens around it. Documents are rebuilt through their
- * constructor, so a row breaking a current domain rule fails to load.
+ * constructor, so a row breaking a current domain rule fails to load, as a persistence error rather than as an invalid
+ * request.
  */
 @Repository
 class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocumentRepository) : DocumentRepository {
@@ -86,13 +87,17 @@ private fun ArchivedDocument.toEntity(): ArchivedDocumentEntity = ArchivedDocume
     deletedAt = deletedAt,
 )
 
-private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = ArchivedDocument(
-    id = DocumentId(id),
-    owner = DocumentOwner(TenantId(tenantId), source),
-    metadata = DocumentMetadata(DocumentType(documentType), businessReference, description, tags),
-    file = StoredFile(fileName, contentType, sizeBytes, ObjectKey(objectKey)),
-    status = DocumentStatus.valueOf(status),
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-    deletedAt = deletedAt,
-)
+private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = try {
+    ArchivedDocument(
+        id = DocumentId(id),
+        owner = DocumentOwner(TenantId(tenantId), source),
+        metadata = DocumentMetadata(DocumentType(documentType), businessReference, description, tags),
+        file = StoredFile(fileName, contentType, sizeBytes, ObjectKey(objectKey)),
+        status = DocumentStatus.valueOf(status),
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        deletedAt = deletedAt,
+    )
+} catch (e: RuntimeException) {
+    throw DocumentPersistenceException("Document $id is stored in an invalid state", e)
+}

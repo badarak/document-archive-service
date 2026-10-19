@@ -1,11 +1,14 @@
 package com.badarak.archive.infrastructure.journey
 
+import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
+import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import com.badarak.archive.infrastructure.adapter.persistence.SpringDataArchivedDocumentRepository
 import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import com.jayway.jsonpath.JsonPath
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -26,6 +29,7 @@ import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import kotlin.random.Random
@@ -51,6 +55,9 @@ class DocumentJourneyIT {
 
     @Autowired
     private lateinit var clock: MutableClock
+
+    @Autowired
+    private lateinit var resumeDeletions: ResumeDeletionsUseCase
 
     @AfterEach
     fun emptyTheArchive() {
@@ -246,6 +253,47 @@ class DocumentJourneyIT {
 
             assertEquals("DELETED", row(id).status)
             assertTrue(storage.keys().isEmpty())
+        }
+    }
+
+    @Nested
+    inner class Reconciliation {
+
+        @Test
+        fun `deletions interrupted by an outage are finished by the reconciliation once their grace period is over`() {
+            val acmeDocument = archive(tenant = ACME)
+            val globexDocument = archive(tenant = GLOBEX)
+            storage.unavailable = true
+            delete(acmeDocument, ACME).andExpect { status { isServiceUnavailable() } }
+            delete(globexDocument, GLOBEX).andExpect { status { isServiceUnavailable() } }
+            storage.unavailable = false
+
+            clock.set(START.plus(Duration.ofMinutes(10)))
+            assertEquals(0, resumeDeletions.resume())
+            assertEquals("DELETING", row(acmeDocument).status)
+
+            clock.set(START.plus(Duration.ofMinutes(16)))
+            assertEquals(2, resumeDeletions.resume())
+
+            assertEquals("DELETED", row(acmeDocument).status)
+            assertEquals("DELETED", row(globexDocument).status)
+            assertTrue(storage.keys().isEmpty())
+            read("$DOCUMENTS/$acmeDocument").andExpect { status { isNotFound() } }
+        }
+
+        @Test
+        fun `a reconciliation during an outage leaves the deletions for the next run`() {
+            val id = archive()
+            storage.unavailable = true
+            delete(id).andExpect { status { isServiceUnavailable() } }
+            clock.set(START.plus(Duration.ofMinutes(16)))
+
+            assertThrows(ObjectStorageException::class.java) { resumeDeletions.resume() }
+
+            assertEquals("DELETING", row(id).status)
+            storage.unavailable = false
+            assertEquals(1, resumeDeletions.resume())
+            assertEquals("DELETED", row(id).status)
         }
     }
 

@@ -168,6 +168,38 @@ class DocumentJourneyIT {
         }
     }
 
+    @Nested
+    inner class TenantIsolation {
+
+        @Test
+        fun `a document of another tenant cannot be read, downloaded, found or deleted`() {
+            val id = archive(tenant = ACME, businessReference = "INV-1")
+
+            read("$DOCUMENTS/$id", GLOBEX).andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("document-not-found") }
+            }
+            read("$DOCUMENTS/$id/content", GLOBEX).andExpect { status { isNotFound() } }
+            assertEquals(emptyList<String>(), search("businessReference=INV-1", GLOBEX))
+            delete(id, GLOBEX).andExpect { status { isNotFound() } }
+
+            read("$DOCUMENTS/$id", ACME).andExpect { status { isOk() } }
+            assertEquals(listOf(id), search("businessReference=INV-1", ACME))
+            assertEquals(1, storage.keys().size)
+        }
+
+        @Test
+        fun `a document of another tenant answers like a document that does not exist`() {
+            val id = archive(tenant = ACME)
+
+            val foreign = read("$DOCUMENTS/$id", GLOBEX).andReturn().response
+            val unknown = read("$DOCUMENTS/${UUID.randomUUID()}", GLOBEX).andReturn().response
+
+            assertEquals(unknown.status, foreign.status)
+            assertEquals(JsonPath.read<String>(unknown.contentAsString, "$.code"), JsonPath.read(foreign.contentAsString, "$.code"))
+        }
+    }
+
     private fun row(id: String) = rows.findById(UUID.fromString(id)).orElseThrow()
 
     private fun delete(id: String, tenant: String = ACME): ResultActionsDsl =
@@ -217,6 +249,7 @@ class DocumentJourneyIT {
         private const val WRITE = "documents:write"
         private const val DELETE = "documents:delete"
         private const val ACME = "acme"
+        private const val GLOBEX = "globex"
         private const val BILLING = "billing-service"
         private const val SALES = "sales-service"
         private val START: Instant = Instant.parse("2026-10-15T09:00:00Z")

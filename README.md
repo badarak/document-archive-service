@@ -120,10 +120,12 @@ The authorization server signs each token with its private key, which it never s
 the matching public keys at `ARCHIVE_JWT_JWKS_URI`; the service downloads them to verify the
 signature. A token is valid when:
 
-- its signature is verified by one of these public keys;
+- it is signed with an accepted algorithm, `ARCHIVE_JWT_ALGORITHMS` (`RS256` by default), and one of
+  these public keys verifies the signature: an unsigned token is always refused;
 - it was issued by `ARCHIVE_JWT_ISSUER`;
 - it is intended for `ARCHIVE_JWT_AUDIENCE`;
-- it has not expired.
+- it is already valid and has not expired;
+- it is sent in the `Authorization` header, never in the URL.
 
 A missing or invalid token gets `401`; a valid token without the required scope gets `403`.
 

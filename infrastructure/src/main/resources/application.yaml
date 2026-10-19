@@ -34,6 +34,8 @@ spring:
           issuer-uri: ${ARCHIVE_JWT_ISSUER}
           jwk-set-uri: ${ARCHIVE_JWT_JWKS_URI}
           audiences: ${ARCHIVE_JWT_AUDIENCE}
+          # Signature algorithms accepted from the issuer; an unsigned token is always refused.
+          jws-algorithms: ${ARCHIVE_JWT_ALGORITHMS:RS256}
 
 archive:
   security:

@@ -84,6 +84,29 @@ class ApiSecurityIT {
     }
 
     @Test
+    fun `a token that is not valid yet is rejected with 401`() {
+        val early = TestAuthorizationServer.token(scope = READ, notBefore = Instant.now().plusSeconds(300))
+
+        getDocuments(early).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `an unsigned token is rejected with 401`() {
+        getDocuments(TestAuthorizationServer.unsignedToken(scope = READ)).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `a token signed with HMAC and the published public key is rejected with 401`() {
+        getDocuments(TestAuthorizationServer.hmacTokenKeyedWithPublicKey(scope = READ)).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `a token sent in the URL instead of the Authorization header is rejected with 401`() {
+        mockMvc.get(DOCUMENTS) { param("access_token", TestAuthorizationServer.token(scope = READ)) }
+            .andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
     fun `a malformed token is rejected with 401`() {
         getDocuments("not-a-jwt").andExpect { status { isUnauthorized() } }
     }

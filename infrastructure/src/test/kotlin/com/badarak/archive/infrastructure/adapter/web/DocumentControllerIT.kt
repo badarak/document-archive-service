@@ -553,6 +553,20 @@ class DocumentControllerIT {
         }
 
         @Test
+        fun `an unexpected error is answered with 500, without internal details`() {
+            every { getDocument.get(any()) } throws IllegalStateException("Connection to jdbc:postgresql://db-internal:5432 lost")
+
+            mockMvc.get("$DOCUMENTS/$ID") {
+                header(HttpHeaders.AUTHORIZATION, "Bearer ${TestAuthorizationServer.token(scope = "documents:read")}")
+            }.andExpect {
+                status { isInternalServerError() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.code") { value("internal-error") }
+                jsonPath("$.detail") { value("An unexpected error occurred") }
+            }
+        }
+
+        @Test
         fun `an invalid document type is refused with 400 before the use case`() {
             post(metadata = """{"documentType": "invoice"}""").andExpect {
                 status { isBadRequest() }

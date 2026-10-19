@@ -67,6 +67,9 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "content-missing", "The content of this document cannot be found")
     }
 
+    @ExceptionHandler(RuntimeException::class)
+    fun handleUnexpectedError(error: RuntimeException): ProblemDetail = internalError(error)
+
     override fun handleMaxUploadSizeExceededException(
         ex: MaxUploadSizeExceededException,
         headers: HttpHeaders,

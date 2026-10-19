@@ -34,6 +34,8 @@ spring:
           issuer-uri: ${ARCHIVE_JWT_ISSUER}
           jwk-set-uri: ${ARCHIVE_JWT_JWKS_URI}
           audiences: ${ARCHIVE_JWT_AUDIENCE}
+          # Signature algorithms accepted from the issuer; an unsigned token is always refused.
+          jws-algorithms: ${ARCHIVE_JWT_ALGORITHMS:RS256}
 
 archive:
   security:
@@ -51,6 +53,13 @@ archive:
       secret-key: ${ARCHIVE_S3_SECRET_KEY}
       path-style-access: ${ARCHIVE_S3_PATH_STYLE_ACCESS:true}
       api-call-timeout: ${ARCHIVE_S3_API_CALL_TIMEOUT:2m}
+
+# The OpenAPI description and the Swagger UI are public, so they are off unless explicitly enabled.
+springdoc:
+  api-docs:
+    enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
+  swagger-ui:
+    enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
 
 management:
   endpoints:

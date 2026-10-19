@@ -390,6 +390,13 @@ class DocumentControllerIT {
             assertEquals(PageRequest(), query.captured.page)
         }
 
+        @Test
+        fun `a tenant sent by the client is ignored in favour of the token's`() {
+            search("tenantId=globex&tenant_id=globex").andExpect { status { isOk() } }
+
+            assertEquals(TenantId("acme"), query.captured.caller.tenantId)
+        }
+
         @ParameterizedTest(name = "{0}")
         @ValueSource(
             strings = [
@@ -500,7 +507,7 @@ class DocumentControllerIT {
 
         @Test
         fun `an identifier that is not a UUID is refused with 400`() {
-            mockMvc.delete("$DOCUMENTS/not-a-uuid") { header(HttpHeaders.AUTHORIZATION, "Bearer ${token()}") }.andExpect {
+            mockMvc.delete("$DOCUMENTS/not-a-uuid") { header(HttpHeaders.AUTHORIZATION, "Bearer ${deleteToken()}") }.andExpect {
                 status { isBadRequest() }
                 content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
             }
@@ -510,7 +517,7 @@ class DocumentControllerIT {
 
         @Test
         fun `a token without tenant is refused with 403`() {
-            delete(TestAuthorizationServer.token(scope = "documents:write", tenant = null)).andExpect {
+            delete(TestAuthorizationServer.token(scope = "documents:delete", tenant = null)).andExpect {
                 status { isForbidden() }
                 jsonPath("$.code") { value("caller-not-identified") }
             }
@@ -518,8 +525,10 @@ class DocumentControllerIT {
             verify(exactly = 0) { deleteDocument.delete(any()) }
         }
 
-        private fun delete(token: String = token()): ResultActionsDsl =
+        private fun delete(token: String = deleteToken()): ResultActionsDsl =
             mockMvc.delete("$DOCUMENTS/$ID") { header(HttpHeaders.AUTHORIZATION, "Bearer $token") }
+
+        private fun deleteToken() = TestAuthorizationServer.token(scope = "documents:delete")
     }
 
     @Nested
@@ -547,6 +556,20 @@ class DocumentControllerIT {
             post().andExpect {
                 status { isServiceUnavailable() }
                 jsonPath("$.detail") { value("The archive is temporarily unavailable, retry later") }
+            }
+        }
+
+        @Test
+        fun `an unexpected error is answered with 500, without internal details`() {
+            every { getDocument.get(any()) } throws IllegalStateException("Connection to jdbc:postgresql://db-internal:5432 lost")
+
+            mockMvc.get("$DOCUMENTS/$ID") {
+                header(HttpHeaders.AUTHORIZATION, "Bearer ${TestAuthorizationServer.token(scope = "documents:read")}")
+            }.andExpect {
+                status { isInternalServerError() }
+                content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.code") { value("internal-error") }
+                jsonPath("$.detail") { value("An unexpected error occurred") }
             }
         }
 

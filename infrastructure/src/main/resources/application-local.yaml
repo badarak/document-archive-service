@@ -5,3 +5,9 @@ spring:
     import:
       - optional:file:.env[.properties]
       - optional:file:../.env[.properties]
+
+springdoc:
+  api-docs:
+    enabled: ${ARCHIVE_OPENAPI_ENABLED:true}
+  swagger-ui:
+    enabled: ${ARCHIVE_OPENAPI_ENABLED:true}

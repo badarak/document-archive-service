@@ -2,11 +2,13 @@ package com.badarak.archive.infrastructure.security
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.PlainJWT
 import com.nimbusds.jwt.SignedJWT
 import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
@@ -47,26 +49,47 @@ object TestAuthorizationServer {
         issuer: String = ISSUER,
         audience: List<String> = listOf(AUDIENCE),
         expiresAt: Instant = Instant.now().plusSeconds(300),
+        notBefore: Instant? = null,
         scope: String? = null,
         signedByServer: Boolean = true,
         tenant: String? = TENANT,
         client: String? = CLIENT,
     ): String {
         val keyPair = if (signedByServer) signingKeyPair else foreignKeyPair
-        val claims = JWTClaimsSet.Builder()
-            .issuer(issuer)
-            .subject("billing-service")
-            .audience(audience)
-            .issueTime(Date.from(expiresAt.minusSeconds(600)))
-            .expirationTime(Date.from(expiresAt))
-            .apply { scope?.let { claim("scope", it) } }
-            .apply { tenant?.let { claim("tenant_id", it) } }
-            .apply { client?.let { claim("azp", it) } }
-            .build()
+        val claims = claims(issuer, audience, expiresAt, notBefore, scope, tenant, client)
         return SignedJWT(JWSHeader.Builder(JWSAlgorithm.RS256).keyID(keyPair.keyID).build(), claims)
             .apply { sign(RSASSASigner(keyPair)) }
             .serialize()
     }
+
+    /** A token without signature (alg none), otherwise valid. */
+    fun unsignedToken(scope: String): String = PlainJWT(claims(scope = scope)).serialize()
+
+    /** A token signed with HS256, an algorithm the service does not accept, otherwise valid. */
+    fun hmacToken(scope: String): String =
+        SignedJWT(JWSHeader.Builder(JWSAlgorithm.HS256).keyID(signingKeyPair.keyID).build(), claims(scope = scope))
+            .apply { sign(MACSigner(ByteArray(32) { it.toByte() })) }
+            .serialize()
+
+    private fun claims(
+        issuer: String = ISSUER,
+        audience: List<String> = listOf(AUDIENCE),
+        expiresAt: Instant = Instant.now().plusSeconds(300),
+        notBefore: Instant? = null,
+        scope: String? = null,
+        tenant: String? = TENANT,
+        client: String? = CLIENT,
+    ): JWTClaimsSet = JWTClaimsSet.Builder()
+        .issuer(issuer)
+        .subject("billing-service")
+        .audience(audience)
+        .issueTime(Date.from(expiresAt.minusSeconds(600)))
+        .expirationTime(Date.from(expiresAt))
+        .apply { notBefore?.let { notBeforeTime(Date.from(it)) } }
+        .apply { scope?.let { claim("scope", it) } }
+        .apply { tenant?.let { claim("tenant_id", it) } }
+        .apply { client?.let { claim("azp", it) } }
+        .build()
 
     private fun generateKeyPair(): RSAKey = RSAKeyGenerator(2048).keyID("test-key").generate()
 }

@@ -15,7 +15,9 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import java.time.Instant
 import java.util.UUID
 
@@ -82,6 +84,29 @@ class ApiSecurityIT {
     }
 
     @Test
+    fun `a token that is not valid yet is rejected with 401`() {
+        val early = TestAuthorizationServer.token(scope = READ, notBefore = Instant.now().plusSeconds(300))
+
+        getDocuments(early).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `an unsigned token is rejected with 401`() {
+        getDocuments(TestAuthorizationServer.unsignedToken(scope = READ)).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `a token signed with an algorithm that is not accepted is rejected with 401`() {
+        getDocuments(TestAuthorizationServer.hmacToken(scope = READ)).andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `a token sent in the URL instead of the Authorization header is rejected with 401`() {
+        mockMvc.get(DOCUMENTS) { param("access_token", TestAuthorizationServer.token(scope = READ)) }
+            .andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
     fun `a malformed token is rejected with 401`() {
         getDocuments("not-a-jwt").andExpect { status { isUnauthorized() } }
     }
@@ -112,6 +137,7 @@ class ApiSecurityIT {
     @Test
     fun `archiving a document requires the write scope`() {
         mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isForbidden() } }
+        mockMvc.post(DOCUMENTS) { bearer(TestAuthorizationServer.token(scope = DELETE)) }.andExpect { status { isForbidden() } }
     }
 
     @Test
@@ -120,19 +146,42 @@ class ApiSecurityIT {
     }
 
     @Test
-    fun `deleting a document requires the write scope`() {
+    fun `deleting a document requires the delete scope`() {
         val document = "$DOCUMENTS/${UUID.randomUUID()}"
 
         mockMvc.delete(document) { bearer(TestAuthorizationServer.token(scope = READ)) }.andExpect { status { isForbidden() } }
-        mockMvc.delete(document) { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isNotFound() } }
+        mockMvc.delete(document) { bearer(TestAuthorizationServer.token(scope = WRITE)) }.andExpect { status { isForbidden() } }
+        mockMvc.delete(document) { bearer(TestAuthorizationServer.token(scope = DELETE)) }.andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `reading documents is refused to the write and delete scopes`() {
+        getDocuments(TestAuthorizationServer.token(scope = "$WRITE $DELETE")).andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `other methods on the document API are closed even with every scope`() {
+        val token = TestAuthorizationServer.token(scope = "$READ $WRITE $DELETE")
+        val document = "$DOCUMENTS/${UUID.randomUUID()}"
+
+        mockMvc.put(document) { bearer(token) }.andExpect { status { isForbidden() } }
+        mockMvc.patch(document) { bearer(token) }.andExpect { status { isForbidden() } }
+        mockMvc.delete(DOCUMENTS) { bearer(token) }.andExpect { status { isForbidden() } }
+        mockMvc.post("$document/content") { bearer(token) }.andExpect { status { isForbidden() } }
     }
 
     @Test
     fun `a path outside the document API is closed even with every scope`() {
-        val token = TestAuthorizationServer.token(scope = "$READ $WRITE")
+        val token = TestAuthorizationServer.token(scope = "$READ $WRITE $DELETE")
 
         mockMvc.get("/api/v1/other") { bearer(token) }.andExpect { status { isForbidden() } }
         mockMvc.get("/actuator/env") { bearer(token) }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
+    fun `the OpenAPI description and the Swagger UI are not published by default`() {
+        mockMvc.get("/v3/api-docs").andExpect { status { isNotFound() } }
+        mockMvc.get("/swagger-ui/index.html").andExpect { status { isNotFound() } }
     }
 
     @Test
@@ -151,6 +200,7 @@ class ApiSecurityIT {
         private const val DOCUMENTS = "/api/v1/documents"
         private const val READ = "documents:read"
         private const val WRITE = "documents:write"
+        private const val DELETE = "documents:delete"
 
         @JvmStatic
         @DynamicPropertySource

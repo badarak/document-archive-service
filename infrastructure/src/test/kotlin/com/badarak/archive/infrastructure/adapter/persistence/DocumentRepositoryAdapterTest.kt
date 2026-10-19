@@ -8,6 +8,7 @@ import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
+import com.badarak.archive.domain.model.InvalidDocumentTypeException
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.model.StoredFile
@@ -18,11 +19,13 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.dao.DataAccessResourceFailureException
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.domain.Specification
 import java.time.Instant
+import java.util.UUID
 
 class DocumentRepositoryAdapterTest {
 
@@ -52,6 +55,44 @@ class DocumentRepositoryAdapterTest {
 
         assertSame(failure, exception.cause)
     }
+
+    @Test
+    fun `a stored row that breaks a domain rule becomes a document persistence error`() {
+        val row = entity(documentType = "invoice")
+        every { repository.findByIdAndTenantId(row.id, "acme") } returns row
+
+        val exception = assertThrows(DocumentPersistenceException::class.java) {
+            adapter.findByIdAndTenant(DocumentId(row.id), TenantId("acme"))
+        }
+
+        assertEquals("Document ${row.id} is stored in an invalid state", exception.message)
+        assertTrue(exception.cause is InvalidDocumentTypeException)
+    }
+
+    @Test
+    fun `a stored row with an unknown status becomes a document persistence error`() {
+        val row = entity(status = "ARCHIVED")
+        every { repository.findByIdAndTenantId(row.id, "acme") } returns row
+
+        assertThrows(DocumentPersistenceException::class.java) { adapter.findByIdAndTenant(DocumentId(row.id), TenantId("acme")) }
+    }
+
+    private fun entity(documentType: String = "INVOICE", status: String = "AVAILABLE") = ArchivedDocumentEntity(
+        id = UUID.randomUUID(),
+        tenantId = "acme",
+        documentType = documentType,
+        source = "billing-service",
+        businessReference = null,
+        description = null,
+        tags = emptyMap(),
+        fileName = "invoice.pdf",
+        contentType = "application/pdf",
+        sizeBytes = 1,
+        objectKey = "documents/${UUID.randomUUID()}",
+        status = status,
+        createdAt = Instant.parse("2026-10-14T09:15:00Z"),
+        updatedAt = Instant.parse("2026-10-14T09:15:00Z"),
+    )
 
     private fun document(): ArchivedDocument = ArchivedDocument.create(
         id = DocumentId.generate(),

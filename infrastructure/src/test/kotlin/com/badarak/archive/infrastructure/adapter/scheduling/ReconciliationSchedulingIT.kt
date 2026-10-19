@@ -12,7 +12,7 @@ import org.springframework.scheduling.config.ScheduledTaskHolder
 import org.springframework.test.context.ActiveProfiles
 import java.time.Duration
 
-class DeletionReconciliationSchedulingIT {
+class ReconciliationSchedulingIT {
 
     @Nested
     @SpringBootTest
@@ -20,7 +20,7 @@ class DeletionReconciliationSchedulingIT {
     inner class Disabled {
 
         @Autowired
-        private lateinit var scheduler: ObjectProvider<DeletionReconciliationScheduler>
+        private lateinit var scheduler: ObjectProvider<ReconciliationScheduler>
 
         @Test
         fun `the reconciliation is not scheduled when disabled`() {

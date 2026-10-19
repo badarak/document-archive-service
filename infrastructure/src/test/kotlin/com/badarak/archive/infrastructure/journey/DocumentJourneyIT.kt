@@ -200,6 +200,55 @@ class DocumentJourneyIT {
         }
     }
 
+    @Nested
+    inner class StorageOutage {
+
+        @Test
+        fun `a download during an outage is answered with 503, while the metadata stay readable`() {
+            val id = archive()
+            storage.unavailable = true
+
+            read("$DOCUMENTS/$id/content").andExpect {
+                status { isServiceUnavailable() }
+                jsonPath("$.code") { value("archive-unavailable") }
+            }
+            read("$DOCUMENTS/$id").andExpect { status { isOk() } }
+        }
+
+        @Test
+        fun `a deletion interrupted by an outage leaves the document unreadable, and replaying it once the storage is back finishes it`() {
+            val id = archive()
+            storage.unavailable = true
+
+            delete(id).andExpect {
+                status { isServiceUnavailable() }
+                jsonPath("$.code") { value("archive-unavailable") }
+            }
+
+            assertEquals("DELETING", row(id).status)
+            read("$DOCUMENTS/$id").andExpect { status { isNotFound() } }
+            assertEquals(emptyList<String>(), search("documentType=INVOICE"))
+            assertEquals(1, storage.keys().size)
+
+            storage.unavailable = false
+            delete(id).andExpect { status { isNoContent() } }
+
+            assertEquals("DELETED", row(id).status)
+            assertTrue(storage.keys().isEmpty())
+        }
+
+        @Test
+        fun `a document left deleting is finished by a new deletion`() {
+            val id = archive()
+            rows.save(row(id).apply { status = "DELETING" })
+
+            delete(id).andExpect { status { isNoContent() } }
+
+            assertEquals("DELETED", row(id).status)
+            assertTrue(storage.keys().isEmpty())
+        }
+    }
+
     private fun row(id: String) = rows.findById(UUID.fromString(id)).orElseThrow()
 
     private fun delete(id: String, tenant: String = ACME): ResultActionsDsl =

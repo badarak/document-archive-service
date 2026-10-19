@@ -71,6 +71,9 @@ one is missing.
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
 | `ARCHIVE_JWT_ISSUER`, `ARCHIVE_JWT_JWKS_URI`, `ARCHIVE_JWT_AUDIENCE` | Access token validation, see [Security](#security) |
 | `ARCHIVE_JWT_TENANT_CLAIM`, `ARCHIVE_JWT_SOURCE_CLAIM` | Optional. Token claims naming the caller's tenant and the calling service (`tenant_id` and `azp` by default) |
+| `ARCHIVE_JWT_ALGORITHMS` | Optional. Signature algorithms accepted from the issuer (`RS256` by default) |
+| `ARCHIVE_OPENAPI_ENABLED` | Optional. Publishes the OpenAPI description and the Swagger UI (`true` with the `local` profile, `false` otherwise) |
+| `ARCHIVE_RECONCILIATION_ENABLED`, `ARCHIVE_RECONCILIATION_INTERVAL`, `ARCHIVE_RECONCILIATION_GRACE_PERIOD`, `ARCHIVE_RECONCILIATION_BATCH_SIZE` | Optional. Resumption of the interrupted deletions, see [API](#api) (`true`, `5m`, `15m` and `100` by default) |
 | `ARCHIVE_ALLOWED_EXTENSIONS` | Optional. Formats callers may archive, among `pdf`, `doc`, `docx`, `mp3`, `wav`, `m4a` and `eml` (all by default). An unknown extension stops the application at startup |
 
 ## The `local` profile
@@ -101,6 +104,11 @@ curl -X POST http://localhost:8080/api/v1/documents \
 The answer is `201 Created`, with the document's `Location` and metadata. Errors are Problem Details
 documents (RFC 9457) with a `code` property, such as `unsupported-format` or `document-too-large`;
 the OpenAPI description lists them per status.
+
+A deletion first records the document as `DELETING`, which hides it, then removes its content from
+the storage and records it as `DELETED`. When the storage fails in between, the answer is `503` and
+the document stays `DELETING`: replaying the `DELETE` finishes it, and so does the reconciliation that
+every instance runs in the background, for deletions left over for longer than the grace period.
 
 ## Security
 

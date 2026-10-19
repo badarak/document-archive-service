@@ -6,6 +6,7 @@ import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import com.badarak.archive.domain.port.inbound.DeleteDocumentUseCase
 import com.badarak.archive.domain.port.inbound.DownloadDocumentUseCase
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
+import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.domain.port.inbound.SearchDocumentsUseCase
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
@@ -13,6 +14,7 @@ import com.badarak.archive.domain.service.ArchiveDocumentService
 import com.badarak.archive.domain.service.DeleteDocumentService
 import com.badarak.archive.domain.service.DownloadDocumentService
 import com.badarak.archive.domain.service.GetDocumentService
+import com.badarak.archive.domain.service.ResumeDeletionsService
 import com.badarak.archive.domain.service.SearchDocumentsService
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -20,7 +22,7 @@ import org.springframework.context.annotation.Configuration
 import java.time.Clock
 
 @Configuration
-@EnableConfigurationProperties(ArchivingProperties::class)
+@EnableConfigurationProperties(ArchivingProperties::class, ReconciliationProperties::class)
 class ArchivingConfiguration {
 
     @Bean
@@ -52,6 +54,14 @@ class ArchivingConfiguration {
     @Bean
     fun deleteDocumentUseCase(documents: DocumentRepository, storage: ObjectStorage, clock: Clock): DeleteDocumentUseCase =
         DeleteDocumentService(documents, storage, clock)
+
+    @Bean
+    fun resumeDeletionsUseCase(
+        documents: DocumentRepository,
+        storage: ObjectStorage,
+        clock: Clock,
+        properties: ReconciliationProperties,
+    ): ResumeDeletionsUseCase = ResumeDeletionsService(documents, storage, clock, properties.gracePeriod, properties.batchSize)
 
     @Bean
     fun searchDocumentsUseCase(documents: DocumentRepository): SearchDocumentsUseCase = SearchDocumentsService(documents)

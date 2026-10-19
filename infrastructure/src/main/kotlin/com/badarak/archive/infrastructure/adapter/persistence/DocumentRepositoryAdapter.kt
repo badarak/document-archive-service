@@ -15,6 +15,7 @@ import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import org.springframework.dao.DataAccessException
+import org.springframework.data.domain.Limit
 import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Repository
@@ -50,6 +51,12 @@ class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocume
         } catch (e: DataAccessException) {
             throw DocumentPersistenceException("Could not search the documents of tenant $tenantId", e)
         }
+
+    override fun findStalled(status: DocumentStatus, updatedBefore: Instant, limit: Int): List<ArchivedDocument> = try {
+        repository.findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(status.name, updatedBefore, Limit.of(limit)).map { it.toDomain() }
+    } catch (e: DataAccessException) {
+        throw DocumentPersistenceException("Could not read the documents left $status", e)
+    }
 }
 
 private val NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt", "id")

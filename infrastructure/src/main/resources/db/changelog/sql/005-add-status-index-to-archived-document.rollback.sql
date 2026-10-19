@@ -1,0 +1,1 @@
+DROP INDEX archive.idx_archived_document_status_updated;

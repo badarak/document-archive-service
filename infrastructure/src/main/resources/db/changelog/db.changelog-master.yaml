@@ -46,3 +46,14 @@ databaseChangeLog:
         - sqlFile:
             path: sql/004-add-deletion-to-archived-document.rollback.sql
             relativeToChangelogFile: true
+  - changeSet:
+      id: 005-add-status-index-to-archived-document
+      author: badarak
+      changes:
+        - sqlFile:
+            path: sql/005-add-status-index-to-archived-document.sql
+            relativeToChangelogFile: true
+      rollback:
+        - sqlFile:
+            path: sql/005-add-status-index-to-archived-document.rollback.sql
+            relativeToChangelogFile: true

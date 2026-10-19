@@ -57,6 +57,18 @@ class DocumentRepositoryAdapterTest {
     }
 
     @Test
+    fun `a database failure while looking for stalled documents becomes a document persistence error`() {
+        val failure = DataAccessResourceFailureException("Connection refused")
+        every { repository.findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(any(), any(), any()) } throws failure
+
+        val exception = assertThrows(DocumentPersistenceException::class.java) {
+            adapter.findStalled(DocumentStatus.DELETING, Instant.parse("2026-10-14T09:15:00Z"), 10)
+        }
+
+        assertSame(failure, exception.cause)
+    }
+
+    @Test
     fun `a stored row that breaks a domain rule becomes a document persistence error`() {
         val row = entity(documentType = "invoice")
         every { repository.findByIdAndTenantId(row.id, "acme") } returns row

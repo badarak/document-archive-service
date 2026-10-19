@@ -187,6 +187,27 @@ class DocumentRepositoryAdapterIT {
         assertEquals(5, beyond.totalElements)
     }
 
+    @Test
+    fun `stalled documents are found whatever their tenant, oldest update first, before the given instant only`() {
+        val oldest = stored(tenant = "acme", status = DocumentStatus.DELETING, createdAt = createdAt)
+        val other = stored(tenant = "globex", status = DocumentStatus.DELETING, createdAt = createdAt.plusSeconds(1))
+        stored(tenant = "acme", status = DocumentStatus.DELETING, createdAt = createdAt.plusSeconds(2))
+        stored(tenant = "acme", status = DocumentStatus.AVAILABLE, createdAt = createdAt)
+
+        val stalled = adapter.findStalled(DocumentStatus.DELETING, createdAt.plusSeconds(2), 10)
+
+        assertEquals(listOf(oldest.id, other.id), stalled.map { it.id })
+        assertEquals(TenantId("globex"), stalled.last().owner.tenantId)
+    }
+
+    @Test
+    fun `no more stalled documents than the limit are found`() {
+        val oldest = stored(status = DocumentStatus.DELETING, createdAt = createdAt)
+        stored(status = DocumentStatus.DELETING, createdAt = createdAt.plusSeconds(1))
+
+        assertEquals(listOf(oldest.id), adapter.findStalled(DocumentStatus.DELETING, later.plusSeconds(60), 1).map { it.id })
+    }
+
     private fun stored(
         tenant: String = "acme",
         status: DocumentStatus = DocumentStatus.AVAILABLE,

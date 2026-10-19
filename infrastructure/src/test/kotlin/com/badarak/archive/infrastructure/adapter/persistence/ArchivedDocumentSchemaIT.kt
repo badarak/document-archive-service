@@ -70,10 +70,15 @@ class ArchivedDocumentSchemaIT {
     }
 
     @Test
+    fun `liquibase creates the index on status and update date`() {
+        assertTrue("idx_archived_document_status_updated" in indexes())
+    }
+
+    @Test
     fun `running liquibase again does not replay applied changesets`() {
         liquibase.afterPropertiesSet()
 
-        assertEquals(4, appliedChangeSetCount())
+        assertEquals(5, appliedChangeSetCount())
     }
 
     @Test

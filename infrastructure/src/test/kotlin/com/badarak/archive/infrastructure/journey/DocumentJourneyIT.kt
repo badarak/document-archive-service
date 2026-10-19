@@ -5,6 +5,7 @@ import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import com.jayway.jsonpath.JsonPath
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -90,6 +91,54 @@ class DocumentJourneyIT {
         }
     }
 
+    @Nested
+    inner class Searching {
+
+        @Test
+        fun `each filter narrows the search, newest documents first`() {
+            val firstInvoice = archiveAt(START, "INVOICE", "INV-1", BILLING)
+            val contract = archiveAt(START.plusSeconds(3600), "CONTRACT", "CTR-1", SALES)
+            val secondInvoice = archiveAt(START.plusSeconds(7200), "INVOICE", "INV-2", BILLING)
+            val salesInvoice = archiveAt(START.plusSeconds(10800), "INVOICE", "INV-3", SALES)
+
+            assertEquals(listOf(salesInvoice, secondInvoice, firstInvoice), search("documentType=INVOICE"))
+            assertEquals(listOf(salesInvoice, contract), search("source=$SALES"))
+            assertEquals(listOf(secondInvoice), search("businessReference=INV-2"))
+            assertEquals(listOf(secondInvoice, contract), search("createdFrom=2026-10-15T10:00:00Z&createdTo=2026-10-15T11:00:00Z"))
+            assertEquals(listOf(secondInvoice, firstInvoice), search("documentType=INVOICE&source=$BILLING"))
+        }
+
+        @Test
+        fun `the documents are returned page by page with their total`() {
+            val newestFirst = (0L..4L).map { archiveAt(START.plusSeconds(it * 60)) }.reversed()
+
+            val body = read("$DOCUMENTS?page=1&size=2").andExpect {
+                status { isOk() }
+                jsonPath("$.page") { value(1) }
+                jsonPath("$.size") { value(2) }
+                jsonPath("$.totalElements") { value(5) }
+                jsonPath("$.totalPages") { value(3) }
+            }.andReturn().response.contentAsString
+
+            assertEquals(newestFirst.subList(2, 4), JsonPath.read<List<String>>(body, "$.content[*].id"))
+        }
+
+        private fun archiveAt(
+            createdAt: Instant,
+            documentType: String = "INVOICE",
+            reference: String? = null,
+            source: String = BILLING,
+        ): String {
+            clock.set(createdAt)
+            return archive(documentType = documentType, businessReference = reference, source = source)
+        }
+    }
+
+    private fun search(parameters: String, tenant: String = ACME): List<String> {
+        val body = read("$DOCUMENTS?$parameters", tenant).andExpect { status { isOk() } }.andReturn().response.contentAsString
+        return JsonPath.read(body, "$.content[*].id")
+    }
+
     private fun archive(
         tenant: String = ACME,
         documentType: String = "INVOICE",
@@ -129,6 +178,7 @@ class DocumentJourneyIT {
         private const val WRITE = "documents:write"
         private const val ACME = "acme"
         private const val BILLING = "billing-service"
+        private const val SALES = "sales-service"
         private val START: Instant = Instant.parse("2026-10-15T09:00:00Z")
         private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + Random(42).nextBytes(1024 * 1024)
 

@@ -6,6 +6,7 @@ import com.jayway.jsonpath.JsonPath
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -22,9 +23,11 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
 import java.time.Instant
+import java.util.UUID
 import kotlin.random.Random
 
 /**
@@ -134,6 +137,42 @@ class DocumentJourneyIT {
         }
     }
 
+    @Nested
+    inner class Deleting {
+
+        @Test
+        fun `a deleted document can no longer be read, downloaded or found, and its content is gone`() {
+            val id = archive()
+            val deletedAt = START.plusSeconds(60)
+            clock.set(deletedAt)
+
+            delete(id).andExpect { status { isNoContent() } }
+
+            read("$DOCUMENTS/$id").andExpect { status { isNotFound() } }
+            read("$DOCUMENTS/$id/content").andExpect { status { isNotFound() } }
+            assertEquals(emptyList<String>(), search("documentType=INVOICE"))
+            assertTrue(storage.keys().isEmpty())
+            val row = row(id)
+            assertEquals("DELETED", row.status)
+            assertEquals(deletedAt, row.deletedAt)
+        }
+
+        @Test
+        fun `deleting a document again succeeds`() {
+            val id = archive()
+            delete(id).andExpect { status { isNoContent() } }
+
+            delete(id).andExpect { status { isNoContent() } }
+
+            assertEquals("DELETED", row(id).status)
+        }
+    }
+
+    private fun row(id: String) = rows.findById(UUID.fromString(id)).orElseThrow()
+
+    private fun delete(id: String, tenant: String = ACME): ResultActionsDsl =
+        mockMvc.delete("$DOCUMENTS/$id") { header(HttpHeaders.AUTHORIZATION, "Bearer ${token(tenant, DELETE)}") }
+
     private fun search(parameters: String, tenant: String = ACME): List<String> {
         val body = read("$DOCUMENTS?$parameters", tenant).andExpect { status { isOk() } }.andReturn().response.contentAsString
         return JsonPath.read(body, "$.content[*].id")
@@ -176,6 +215,7 @@ class DocumentJourneyIT {
         private const val DOCUMENTS = "/api/v1/documents"
         private const val READ = "documents:read"
         private const val WRITE = "documents:write"
+        private const val DELETE = "documents:delete"
         private const val ACME = "acme"
         private const val BILLING = "billing-service"
         private const val SALES = "sales-service"

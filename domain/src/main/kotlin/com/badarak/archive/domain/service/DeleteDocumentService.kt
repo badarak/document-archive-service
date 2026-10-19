@@ -11,6 +11,8 @@ import java.time.Clock
 class DeleteDocumentService(private val documents: DocumentRepository, private val storage: ObjectStorage, private val clock: Clock) :
     DeleteDocumentUseCase {
 
+    private val deletion = DocumentDeletion(documents, storage, clock)
+
     override fun delete(query: DocumentQuery) {
         val document = documents.findByIdAndTenant(query.id, query.caller.tenantId) ?: throw DocumentNotFoundException(query.id)
         val deleting = when (document.status) {
@@ -19,7 +21,6 @@ class DeleteDocumentService(private val documents: DocumentRepository, private v
             DocumentStatus.DELETED -> return
             DocumentStatus.PENDING, DocumentStatus.FAILED -> throw DocumentNotFoundException(query.id)
         }
-        storage.delete(deleting.file.objectKey)
-        documents.save(deleting.markDeleted(clock.instant()))
+        deletion.finish(deleting)
     }
 }

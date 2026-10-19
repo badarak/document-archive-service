@@ -65,16 +65,11 @@ object TestAuthorizationServer {
     /** A token without signature (alg none), otherwise valid. */
     fun unsignedToken(scope: String): String = PlainJWT(claims(scope = scope)).serialize()
 
-    /**
-     * A token signed with HMAC, keyed with the server's public key: it would pass a decoder that lets the token choose its
-     * algorithm and verifies it with the published key.
-     */
-    fun hmacTokenKeyedWithPublicKey(scope: String): String {
-        val secret = signingKeyPair.toRSAPublicKey().encoded
-        return SignedJWT(JWSHeader.Builder(JWSAlgorithm.HS256).keyID(signingKeyPair.keyID).build(), claims(scope = scope))
-            .apply { sign(MACSigner(secret)) }
+    /** A token signed with HS256, an algorithm the service does not accept, otherwise valid. */
+    fun hmacToken(scope: String): String =
+        SignedJWT(JWSHeader.Builder(JWSAlgorithm.HS256).keyID(signingKeyPair.keyID).build(), claims(scope = scope))
+            .apply { sign(MACSigner(ByteArray(32) { it.toByte() })) }
             .serialize()
-    }
 
     private fun claims(
         issuer: String = ISSUER,

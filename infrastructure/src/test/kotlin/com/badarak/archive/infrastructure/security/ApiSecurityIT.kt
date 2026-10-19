@@ -96,8 +96,8 @@ class ApiSecurityIT {
     }
 
     @Test
-    fun `a token signed with HMAC and the published public key is rejected with 401`() {
-        getDocuments(TestAuthorizationServer.hmacTokenKeyedWithPublicKey(scope = READ)).andExpect { status { isUnauthorized() } }
+    fun `a token signed with an algorithm that is not accepted is rejected with 401`() {
+        getDocuments(TestAuthorizationServer.hmacToken(scope = READ)).andExpect { status { isUnauthorized() } }
     }
 
     @Test

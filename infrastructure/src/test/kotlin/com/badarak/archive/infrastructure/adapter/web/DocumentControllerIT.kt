@@ -390,6 +390,13 @@ class DocumentControllerIT {
             assertEquals(PageRequest(), query.captured.page)
         }
 
+        @Test
+        fun `a tenant sent by the client is ignored in favour of the token's`() {
+            search("tenantId=globex&tenant_id=globex").andExpect { status { isOk() } }
+
+            assertEquals(TenantId("acme"), query.captured.caller.tenantId)
+        }
+
         @ParameterizedTest(name = "{0}")
         @ValueSource(
             strings = [

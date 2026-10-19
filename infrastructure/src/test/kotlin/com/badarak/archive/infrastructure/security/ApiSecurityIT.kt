@@ -179,6 +179,12 @@ class ApiSecurityIT {
     }
 
     @Test
+    fun `the OpenAPI description and the Swagger UI are not published by default`() {
+        mockMvc.get("/v3/api-docs").andExpect { status { isNotFound() } }
+        mockMvc.get("/swagger-ui/index.html").andExpect { status { isNotFound() } }
+    }
+
+    @Test
     fun `the health endpoint needs no token`() {
         mockMvc.get("/actuator/health").andExpect { status { isOk() } }
         mockMvc.get("/actuator/health/readiness").andExpect { status { isOk() } }

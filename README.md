@@ -86,7 +86,8 @@ one of these two working directories.
 ## API
 
 The API is described by OpenAPI: browse it at <http://localhost:8080/swagger-ui/index.html>, or read
-the raw description at `/v3/api-docs`.
+the raw description at `/v3/api-docs`. Both are published with the `local` profile only; set
+`ARCHIVE_OPENAPI_ENABLED=true` to publish them elsewhere.
 
 Archiving a document takes a multipart request with a `file` part and a JSON `metadata` part:
 
@@ -110,7 +111,7 @@ The service is an OAuth2 resource server: callers authenticate with a JWT access
 |---|---|
 | `/actuator/health` and its probes | None, so monitoring can call them |
 | `/.well-known/oauth-protected-resource` | None; standard metadata published by Spring Security (the service URL and the bearer method) |
-| `/v3/api-docs` and `/swagger-ui/**` | None; the OpenAPI description of the API |
+| `/v3/api-docs` and `/swagger-ui/**` | None; the OpenAPI description of the API, when `ARCHIVE_OPENAPI_ENABLED` is true |
 | `GET /api/v1/documents/**` (read, search, download) | Valid token with the `documents:read` scope |
 | `POST /api/v1/documents` (archive) | Valid token with the `documents:write` scope |
 | `DELETE /api/v1/documents/{id}` (delete) | Valid token with the `documents:delete` scope |

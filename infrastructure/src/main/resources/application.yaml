@@ -54,6 +54,13 @@ archive:
       path-style-access: ${ARCHIVE_S3_PATH_STYLE_ACCESS:true}
       api-call-timeout: ${ARCHIVE_S3_API_CALL_TIMEOUT:2m}
 
+# The OpenAPI description and the Swagger UI are public, so they are off unless explicitly enabled.
+springdoc:
+  api-docs:
+    enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
+  swagger-ui:
+    enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
+
 management:
   endpoints:
     web:

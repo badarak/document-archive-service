@@ -44,6 +44,12 @@ archive:
       source: ${ARCHIVE_JWT_SOURCE_CLAIM:azp}
   documents:
     allowed-extensions: ${ARCHIVE_ALLOWED_EXTENSIONS:pdf,doc,docx,mp3,wav,m4a,eml}
+  # Finishes the deletions left DELETING by a storage outage, once their grace period is over.
+  reconciliation:
+    enabled: ${ARCHIVE_RECONCILIATION_ENABLED:true}
+    interval: ${ARCHIVE_RECONCILIATION_INTERVAL:5m}
+    grace-period: ${ARCHIVE_RECONCILIATION_GRACE_PERIOD:15m}
+    batch-size: ${ARCHIVE_RECONCILIATION_BATCH_SIZE:100}
   storage:
     s3:
       endpoint: ${ARCHIVE_S3_ENDPOINT}

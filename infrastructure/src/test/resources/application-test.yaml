@@ -15,6 +15,9 @@ spring:
 
 # Placeholder storage settings: the S3 client is built but never contacts a server in tests.
 archive:
+  # Journey tests run the reconciliation themselves, so it is never scheduled in tests.
+  reconciliation:
+    enabled: false
   storage:
     s3:
       endpoint: http://localhost:9000

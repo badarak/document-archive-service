@@ -73,7 +73,7 @@ one is missing.
 | `ARCHIVE_JWT_TENANT_CLAIM`, `ARCHIVE_JWT_SOURCE_CLAIM` | Optional. Token claims naming the caller's tenant and the calling service (`tenant_id` and `azp` by default) |
 | `ARCHIVE_JWT_ALGORITHMS` | Optional. Signature algorithms accepted from the issuer (`RS256` by default) |
 | `ARCHIVE_OPENAPI_ENABLED` | Optional. Publishes the OpenAPI description and the Swagger UI (`true` with the `local` profile, `false` otherwise) |
-| `ARCHIVE_RECONCILIATION_ENABLED`, `ARCHIVE_RECONCILIATION_INTERVAL`, `ARCHIVE_RECONCILIATION_GRACE_PERIOD`, `ARCHIVE_RECONCILIATION_BATCH_SIZE` | Optional. Resumption of the interrupted deletions, see [API](#api) (`true`, `5m`, `15m` and `100` by default) |
+| `ARCHIVE_RECONCILIATION_ENABLED`, `ARCHIVE_RECONCILIATION_INTERVAL`, `ARCHIVE_RECONCILIATION_GRACE_PERIOD`, `ARCHIVE_RECONCILIATION_BATCH_SIZE` | Optional. Resumption of the interrupted deletions and abandonment of the interrupted archivings, see [API](#api) (`true`, `5m`, `15m` and `100` by default) |
 | `ARCHIVE_ALLOWED_EXTENSIONS` | Optional. Formats callers may archive, among `pdf`, `doc`, `docx`, `mp3`, `wav`, `m4a` and `eml` (all by default). An unknown extension stops the application at startup |
 
 ## The `local` profile
@@ -109,6 +109,14 @@ A deletion first records the document as `DELETING`, which hides it, then remove
 the storage and records it as `DELETED`. When the storage fails in between, the answer is `503` and
 the document stays `DELETING`: replaying the `DELETE` finishes it, and so does the reconciliation that
 every instance runs in the background, for deletions left over for longer than the grace period.
+
+An archiving first records the document as `PENDING`, uploads its content, then records it as
+`AVAILABLE`. When it fails, the answer is an error and the caller archives the file again as a new
+document: the service removes whatever content reached the storage and records the failed one as
+`FAILED`. If that cleanup fails too, or if the instance stops during the upload, the document stays
+`PENDING`; the same reconciliation removes its content and records it as `FAILED` once the grace
+period is over. The grace period must therefore exceed `ARCHIVE_S3_API_CALL_TIMEOUT`, the longest an
+upload can take, or the application does not start.
 
 ## Security
 

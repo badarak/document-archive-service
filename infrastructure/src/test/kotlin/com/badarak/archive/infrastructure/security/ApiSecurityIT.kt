@@ -2,10 +2,13 @@ package com.badarak.archive.infrastructure.security
 
 import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -18,6 +21,8 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
 import java.util.UUID
 
@@ -39,6 +44,18 @@ class ApiSecurityIT {
             jsonPath("$.code") { value("unauthenticated") }
             jsonPath("$.instance") { value(DOCUMENTS) }
         }
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(
+        "GET, /api/v1/documents",
+        "GET, /api/v1/documents/7d7d57e1-4c50-4cb9-98b8-c5b60e8a2f01",
+        "GET, /api/v1/documents/7d7d57e1-4c50-4cb9-98b8-c5b60e8a2f01/content",
+        "POST, /api/v1/documents",
+        "DELETE, /api/v1/documents/7d7d57e1-4c50-4cb9-98b8-c5b60e8a2f01",
+    )
+    fun `every operation of the document API rejects a request without token with 401`(method: HttpMethod, path: String) {
+        mockMvc.perform(request(method, path)).andExpect(status().isUnauthorized)
     }
 
     @Test

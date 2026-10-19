@@ -8,7 +8,7 @@ import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
 import java.time.Clock
 
-class DeleteDocumentService(private val documents: DocumentRepository, private val storage: ObjectStorage, private val clock: Clock) :
+class DeleteDocumentService(private val documents: DocumentRepository, storage: ObjectStorage, private val clock: Clock) :
     DeleteDocumentUseCase {
 
     private val deletion = DocumentDeletion(documents, storage, clock)

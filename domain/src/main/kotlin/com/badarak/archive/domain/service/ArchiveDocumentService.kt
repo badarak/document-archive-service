@@ -22,10 +22,11 @@ import java.time.Clock
  * Archives a document: validates it, records it as PENDING, uploads its content, then records it
  * as AVAILABLE.
  *
- * A refused document leaves no trace. When the upload or the final save fails, the document is
- * recorded as FAILED and the error is rethrown; if even that save fails, its error is attached to
- * the original one as suppressed and the document stays PENDING. A document is never AVAILABLE
- * without its content.
+ * A refused document leaves no trace. When the upload or the final save fails, whatever content
+ * reached the storage is removed, the document is recorded as FAILED and the error is rethrown; if
+ * the removal or that save fails too, its error is attached to the original one as suppressed and
+ * the document stays PENDING until it is abandoned. A document is never AVAILABLE without its
+ * content, nor FAILED with one.
  */
 class ArchiveDocumentService(
     private val documents: DocumentRepository,
@@ -34,6 +35,8 @@ class ArchiveDocumentService(
     private val sizePolicy: DocumentSizePolicy,
     private val clock: Clock,
 ) : ArchiveDocumentUseCase {
+
+    private val failure = ArchivingFailure(documents, storage, clock)
 
     override fun archive(command: ArchiveDocumentCommand): ArchivedDocument {
         val file = command.file
@@ -76,7 +79,9 @@ class ArchiveDocumentService(
 
     private fun recordFailure(pending: ArchivedDocument, cause: Exception) {
         try {
-            documents.save(pending.markFailed(clock.instant()))
+            failure.record(pending)
+        } catch (e: ObjectStorageException) {
+            cause.addSuppressed(e)
         } catch (e: DocumentPersistenceException) {
             cause.addSuppressed(e)
         }

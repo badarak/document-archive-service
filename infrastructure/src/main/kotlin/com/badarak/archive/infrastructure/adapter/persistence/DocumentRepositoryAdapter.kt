@@ -2,6 +2,7 @@ package com.badarak.archive.infrastructure.adapter.persistence
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentPage
@@ -106,10 +107,7 @@ private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = try {
         owner = DocumentOwner(TenantId(tenantId), source),
         metadata = DocumentMetadata(DocumentType(documentType), businessReference, description, tags),
         file = StoredFile(fileName, contentType, sizeBytes, ObjectKey(objectKey)),
-        status = DocumentStatus.valueOf(status),
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-        deletedAt = deletedAt,
+        lifecycle = DocumentLifecycle(DocumentStatus.valueOf(status), createdAt, updatedAt, deletedAt),
     )
 } catch (e: RuntimeException) {
     throw DocumentPersistenceException("Document ${getId()} is stored in an invalid state", e)

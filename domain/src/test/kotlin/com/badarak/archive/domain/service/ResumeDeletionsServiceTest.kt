@@ -2,6 +2,7 @@ package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentStatus
@@ -97,8 +98,10 @@ class ResumeDeletionsServiceTest {
         owner = DocumentOwner(TenantId(tenant), "billing-service"),
         metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
         file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        status = DocumentStatus.DELETING,
-        createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-        updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+        lifecycle = DocumentLifecycle(
+            status = DocumentStatus.DELETING,
+            createdAt = Instant.parse("2026-10-15T09:15:00Z"),
+            updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+        ),
     )
 }

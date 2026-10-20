@@ -49,38 +49,6 @@ class ArchivedDocumentTest {
     }
 
     @Nested
-    inner class Validation {
-
-        @Test
-        fun `a document cannot be updated before it was created`() {
-            val exception = assertThrows(InvalidDocumentException::class.java) {
-                existingDocument(status = DocumentStatus.AVAILABLE, updatedAt = createdAt.minusSeconds(1))
-            }
-
-            assertEquals("updatedAt", exception.field)
-        }
-
-        @Test
-        fun `a deleted document must have a deletion date`() {
-            val exception = assertThrows(InvalidDocumentException::class.java) {
-                ArchivedDocument(DocumentId.generate(), owner, metadata, file, DocumentStatus.DELETED, createdAt, later)
-            }
-
-            assertEquals("deletedAt", exception.field)
-        }
-
-        @ParameterizedTest
-        @EnumSource(DocumentStatus::class, names = ["DELETED"], mode = EnumSource.Mode.EXCLUDE)
-        fun `a document that is not deleted has no deletion date`(status: DocumentStatus) {
-            val exception = assertThrows(InvalidDocumentException::class.java) {
-                ArchivedDocument(DocumentId.generate(), owner, metadata, file, status, createdAt, later, deletedAt = later)
-            }
-
-            assertEquals("deletedAt", exception.field)
-        }
-    }
-
-    @Nested
     inner class Transitions {
 
         @Test
@@ -198,14 +166,11 @@ class ArchivedDocumentTest {
         sizePolicy: DocumentSizePolicy = DocumentSizePolicy(),
     ): ArchivedDocument = ArchivedDocument.create(id, owner, metadata, file, sizePolicy, createdAt)
 
-    private fun existingDocument(status: DocumentStatus, updatedAt: Instant = createdAt): ArchivedDocument = ArchivedDocument(
+    private fun existingDocument(status: DocumentStatus): ArchivedDocument = ArchivedDocument(
         DocumentId.generate(),
         owner,
         metadata,
         file,
-        status,
-        createdAt,
-        updatedAt,
-        deletedAt = updatedAt.takeIf { status == DocumentStatus.DELETED },
+        DocumentLifecycle(status, createdAt, createdAt, deletedAt = createdAt.takeIf { status == DocumentStatus.DELETED }),
     )
 }

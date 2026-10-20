@@ -2,6 +2,7 @@ package com.badarak.archive.infrastructure.adapter.persistence
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSearchCriteria
@@ -254,9 +255,7 @@ class DocumentRepositoryAdapterIT {
         owner = DocumentOwner(TenantId(tenant), source),
         metadata = DocumentMetadata(DocumentType(type), reference, null, emptyMap()),
         file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        status = status,
-        createdAt = createdAt,
-        updatedAt = createdAt,
+        lifecycle = DocumentLifecycle(status, createdAt, createdAt),
     ).also { adapter.create(it) }
 
     private fun pendingDocument(): ArchivedDocument = ArchivedDocument.create(

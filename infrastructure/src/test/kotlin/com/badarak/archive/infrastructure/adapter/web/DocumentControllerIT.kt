@@ -6,6 +6,7 @@ import com.badarak.archive.domain.model.ContentMismatchException
 import com.badarak.archive.domain.model.ContentTypeMismatchException
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentNotFoundException
 import com.badarak.archive.domain.model.DocumentOwner
@@ -317,9 +318,11 @@ class DocumentControllerIT {
             owner = DocumentOwner(TenantId("acme"), "billing-service"),
             metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
             file = StoredFile(fileName, "application/pdf", content.size.toLong(), ObjectKey.generate()),
-            status = DocumentStatus.AVAILABLE,
-            createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-            updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+            lifecycle = DocumentLifecycle(
+                status = DocumentStatus.AVAILABLE,
+                createdAt = Instant.parse("2026-10-15T09:15:00Z"),
+                updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+            ),
         )
 
         private fun readToken() = TestAuthorizationServer.token(scope = "documents:read")

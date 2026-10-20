@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import org.springdoc.core.annotations.ParameterObject
 import org.springframework.core.io.Resource
 import org.springframework.http.MediaType
-import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.web.multipart.MultipartFile
 import java.util.UUID
@@ -32,36 +31,11 @@ interface DocumentApi {
         ),
     )
     @ApiResponse(responseCode = "201", description = "Document archived; Location points to the document")
-    @ApiResponse(
-        responseCode = "400",
-        description = "Missing part, malformed metadata, invalid field or empty file",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "401",
-        description = "Missing, invalid or expired access token",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "403",
-        description = "Token without the documents:write scope, or without tenant or source claim",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "413",
-        description = "File larger than 50 MiB",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "415",
-        description = "Format not allowed, or declared type or content not matching the extension",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "503",
-        description = "Object storage or document store unavailable",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
+    @ApiResponse(responseCode = "400", description = "Missing part, malformed metadata, invalid field or empty file")
+    @ApiResponse(responseCode = "403", description = "Token without the documents:write scope, or without tenant or source claim")
+    @ApiResponse(responseCode = "413", description = "File larger than 50 MiB")
+    @ApiResponse(responseCode = "415", description = "Format not allowed, or declared type or content not matching the extension")
+    @ApiResponse(responseCode = "503", description = "Object storage or document store unavailable")
     fun archive(
         @Parameter(description = "The file to archive, with its original name and content type")
         file: MultipartFile,
@@ -81,23 +55,9 @@ interface DocumentApi {
     @ApiResponse(
         responseCode = "400",
         description = "Malformed filter, period ending before it starts, negative page, or size out of 1 to 100",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
     )
-    @ApiResponse(
-        responseCode = "401",
-        description = "Missing, invalid or expired access token",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "403",
-        description = "Token without the documents:read scope, or without tenant or source claim",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "503",
-        description = "Document store unavailable",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
+    @ApiResponse(responseCode = "403", description = "Token without the documents:read scope, or without tenant or source claim")
+    @ApiResponse(responseCode = "503", description = "Document store unavailable")
     fun search(
         @ParameterObject
         request: SearchDocumentsRequest,
@@ -112,31 +72,10 @@ interface DocumentApi {
             "with the same 404.",
     )
     @ApiResponse(responseCode = "200", description = "Metadata of the document")
-    @ApiResponse(
-        responseCode = "400",
-        description = "Identifier that is not a UUID",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "401",
-        description = "Missing, invalid or expired access token",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "403",
-        description = "Token without the documents:read scope, or without tenant or source claim",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "404",
-        description = "No available document with this identifier for the caller's tenant",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "503",
-        description = "Document store unavailable",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
+    @ApiResponse(responseCode = "400", description = "Identifier that is not a UUID")
+    @ApiResponse(responseCode = "403", description = "Token without the documents:read scope, or without tenant or source claim")
+    @ApiResponse(responseCode = "404", description = "No available document with this identifier for the caller's tenant")
+    @ApiResponse(responseCode = "503", description = "Document store unavailable")
     fun get(
         @Parameter(description = "Identifier of the document, as returned when it was archived")
         id: UUID,
@@ -154,36 +93,11 @@ interface DocumentApi {
         description = "The file, byte for byte",
         content = [Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE, schema = Schema(type = "string", format = "binary"))],
     )
-    @ApiResponse(
-        responseCode = "400",
-        description = "Identifier that is not a UUID",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "401",
-        description = "Missing, invalid or expired access token",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "403",
-        description = "Token without the documents:read scope, or without tenant or source claim",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "404",
-        description = "No available document with this identifier for the caller's tenant",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "500",
-        description = "The document's content is missing from the storage",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "503",
-        description = "Object storage or document store unavailable",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
+    @ApiResponse(responseCode = "400", description = "Identifier that is not a UUID")
+    @ApiResponse(responseCode = "403", description = "Token without the documents:read scope, or without tenant or source claim")
+    @ApiResponse(responseCode = "404", description = "No available document with this identifier for the caller's tenant")
+    @ApiResponse(responseCode = "500", description = "The document's content is missing from the storage")
+    @ApiResponse(responseCode = "503", description = "Object storage or document store unavailable")
     fun download(
         @Parameter(description = "Identifier of the document, as returned when it was archived")
         id: UUID,
@@ -199,30 +113,12 @@ interface DocumentApi {
             "interrupted by a storage failure finishes it.",
     )
     @ApiResponse(responseCode = "204", description = "Document deleted")
-    @ApiResponse(
-        responseCode = "400",
-        description = "Identifier that is not a UUID",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "401",
-        description = "Missing, invalid or expired access token",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "403",
-        description = "Token without the documents:delete scope, or without tenant or source claim",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
-    @ApiResponse(
-        responseCode = "404",
-        description = "No available or deleted document with this identifier for the caller's tenant",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
-    )
+    @ApiResponse(responseCode = "400", description = "Identifier that is not a UUID")
+    @ApiResponse(responseCode = "403", description = "Token without the documents:delete scope, or without tenant or source claim")
+    @ApiResponse(responseCode = "404", description = "No available or deleted document with this identifier for the caller's tenant")
     @ApiResponse(
         responseCode = "503",
         description = "Object storage or document store unavailable; the document stays unreadable and the deletion can be replayed",
-        content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
     )
     fun delete(
         @Parameter(description = "Identifier of the document, as returned when it was archived")
@@ -230,8 +126,4 @@ interface DocumentApi {
         @Parameter(hidden = true)
         caller: AuthenticatedCaller,
     ): ResponseEntity<Void>
-
-    companion object {
-        const val PROBLEM = MediaType.APPLICATION_PROBLEM_JSON_VALUE
-    }
 }

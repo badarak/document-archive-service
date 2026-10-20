@@ -44,7 +44,8 @@ archive:
       source: ${ARCHIVE_JWT_SOURCE_CLAIM:azp}
   documents:
     allowed-extensions: ${ARCHIVE_ALLOWED_EXTENSIONS:pdf,doc,docx,mp3,wav,m4a,eml}
-  # Finishes the deletions left DELETING by a storage outage, once their grace period is over.
+  # Finishes the deletions left DELETING and abandons the archivings left PENDING, once their grace period is over.
+  # The grace period must exceed the storage api-call-timeout, or the application does not start.
   reconciliation:
     enabled: ${ARCHIVE_RECONCILIATION_ENABLED:true}
     interval: ${ARCHIVE_RECONCILIATION_INTERVAL:5m}

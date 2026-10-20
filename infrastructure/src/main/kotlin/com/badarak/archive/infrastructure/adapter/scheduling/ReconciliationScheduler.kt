@@ -1,5 +1,6 @@
 package com.badarak.archive.infrastructure.adapter.scheduling
 
+import com.badarak.archive.domain.port.inbound.AbandonStalledArchivingsUseCase
 import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.infrastructure.config.ReconciliationProperties
 import org.slf4j.LoggerFactory
@@ -10,15 +11,16 @@ import org.springframework.scheduling.annotation.SchedulingConfigurer
 import org.springframework.scheduling.config.ScheduledTaskRegistrar
 
 /**
- * Resumes the deletions left in progress at a fixed delay after each run. Every instance of the service runs it, with no
- * lock between them: resuming a deletion is idempotent, so concurrent runs only repeat some storage calls. A run that
- * fails is logged and retried at the next one.
+ * Resumes the deletions left in progress, then abandons the archivings left pending, at a fixed delay after each run.
+ * Every instance of the service runs it, with no lock between them: both steps are idempotent, so concurrent runs only
+ * repeat some storage calls. A step that fails is logged and retried at the next run, without preventing the other one.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 @ConditionalOnBooleanProperty("archive.reconciliation.enabled")
-class DeletionReconciliationScheduler(
+class ReconciliationScheduler(
     private val resumeDeletions: ResumeDeletionsUseCase,
+    private val abandonArchivings: AbandonStalledArchivingsUseCase,
     private val properties: ReconciliationProperties,
 ) : SchedulingConfigurer {
 
@@ -29,11 +31,16 @@ class DeletionReconciliationScheduler(
     }
 
     fun run() {
+        reconcile("deletions left in progress", "finished") { resumeDeletions.resume() }
+        reconcile("archivings left pending", "abandoned") { abandonArchivings.abandon() }
+    }
+
+    private fun reconcile(subject: String, outcome: String, step: () -> Int) {
         try {
-            val finished = resumeDeletions.resume()
-            if (finished > 0) log.info("Finished {} deletions left in progress", finished)
+            val count = step()
+            if (count > 0) log.info("Reconciliation {} {} {}", outcome, count, subject)
         } catch (e: RuntimeException) {
-            log.warn("Deletion reconciliation interrupted, retried at the next run: {}", e.message, e)
+            log.warn("Reconciliation of the {} interrupted, retried at the next run: {}", subject, e.message, e)
         }
     }
 }

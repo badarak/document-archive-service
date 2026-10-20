@@ -1,5 +1,6 @@
 package com.badarak.archive.infrastructure.journey
 
+import com.badarak.archive.domain.port.inbound.AbandonStalledArchivingsUseCase
 import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import com.badarak.archive.infrastructure.adapter.persistence.SpringDataArchivedDocumentRepository
@@ -58,6 +59,9 @@ class DocumentJourneyIT {
 
     @Autowired
     private lateinit var resumeDeletions: ResumeDeletionsUseCase
+
+    @Autowired
+    private lateinit var abandonArchivings: AbandonStalledArchivingsUseCase
 
     @AfterEach
     fun emptyTheArchive() {
@@ -295,6 +299,42 @@ class DocumentJourneyIT {
             assertEquals(1, resumeDeletions.resume())
             assertEquals("DELETED", row(id).status)
         }
+
+        @Test
+        fun `an archiving refused by an outage stays pending, then is abandoned once the storage is back and its grace period is over`() {
+            storage.unavailable = true
+
+            upload().andExpect {
+                status { isServiceUnavailable() }
+                jsonPath("$.code") { value("archive-unavailable") }
+            }
+
+            val pending = rows.findAll().single()
+            assertEquals("PENDING", pending.status)
+            storage.unavailable = false
+
+            clock.set(START.plus(Duration.ofMinutes(10)))
+            assertEquals(0, abandonArchivings.abandon())
+
+            clock.set(START.plus(Duration.ofMinutes(16)))
+            assertEquals(1, abandonArchivings.abandon())
+
+            assertEquals("FAILED", row(pending.id.toString()).status)
+            assertTrue(storage.keys().isEmpty())
+        }
+
+        @Test
+        fun `an archiving interrupted after its upload is abandoned with its content`() {
+            val id = archive()
+            rows.save(row(id).apply { status = "PENDING" })
+            clock.set(START.plus(Duration.ofMinutes(16)))
+
+            assertEquals(1, abandonArchivings.abandon())
+
+            assertEquals("FAILED", row(id).status)
+            assertTrue(storage.keys().isEmpty())
+            read("$DOCUMENTS/$id").andExpect { status { isNotFound() } }
+        }
     }
 
     private fun row(id: String) = rows.findById(UUID.fromString(id)).orElseThrow()
@@ -313,13 +353,22 @@ class DocumentJourneyIT {
         businessReference: String? = null,
         source: String = BILLING,
     ): String {
+        val response = upload(tenant, documentType, businessReference, source).andExpect { status { isCreated() } }.andReturn().response
+        return JsonPath.read(response.contentAsString, "$.id")
+    }
+
+    private fun upload(
+        tenant: String = ACME,
+        documentType: String = "INVOICE",
+        businessReference: String? = null,
+        source: String = BILLING,
+    ): ResultActionsDsl {
         val metadata = """{"documentType": "$documentType"${businessReference?.let { """, "businessReference": "$it"""" } ?: ""}}"""
-        val body = mockMvc.multipart(DOCUMENTS) {
+        return mockMvc.multipart(DOCUMENTS) {
             file(MockMultipartFile("file", "invoice.pdf", "application/pdf", PDF))
             file(MockMultipartFile("metadata", "", "application/json", metadata.toByteArray()))
             header(HttpHeaders.AUTHORIZATION, "Bearer ${token(tenant, WRITE, source)}")
-        }.andExpect { status { isCreated() } }.andReturn().response.contentAsString
-        return JsonPath.read(body, "$.id")
+        }
     }
 
     private fun read(path: String, tenant: String = ACME): ResultActionsDsl =

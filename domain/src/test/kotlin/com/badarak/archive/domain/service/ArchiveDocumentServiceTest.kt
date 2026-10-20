@@ -22,6 +22,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
@@ -57,6 +58,7 @@ class ArchiveDocumentServiceTest {
     fun acceptEveryCall() {
         every { documents.save(capture(saved)) } just Runs
         every { storage.store(any(), any(), any(), any()) } answers { uploaded = secondArg<InputStream>().readAllBytes() }
+        every { storage.delete(any()) } just Runs
     }
 
     @Nested
@@ -135,16 +137,34 @@ class ArchiveDocumentServiceTest {
 
             assertSame(persistenceFailure, exception)
             verify(exactly = 0) { storage.store(any(), any(), any(), any()) }
+            verify(exactly = 0) { storage.delete(any()) }
         }
 
         @Test
-        fun `a failed upload records the document as failed`() {
+        fun `a failed upload removes whatever content reached the storage, then records the document as failed`() {
             every { storage.store(any(), any(), any(), any()) } throws storageFailure
 
             val exception = assertThrows(ObjectStorageException::class.java) { service.archive(command()) }
 
             assertSame(storageFailure, exception)
             assertEquals(listOf(DocumentStatus.PENDING, DocumentStatus.FAILED), saved.map { it.status })
+            verifyOrder {
+                storage.delete(saved.first().file.objectKey)
+                documents.save(match { it.status == DocumentStatus.FAILED })
+            }
+        }
+
+        @Test
+        fun `a failed upload leaves the document pending when its content cannot be removed`() {
+            val failedRemoval = ObjectStorageException("Storage still unavailable", RuntimeException("Connection refused"))
+            every { storage.store(any(), any(), any(), any()) } throws storageFailure
+            every { storage.delete(any()) } throws failedRemoval
+
+            val exception = assertThrows(ObjectStorageException::class.java) { service.archive(command()) }
+
+            assertSame(storageFailure, exception)
+            assertEquals(listOf(failedRemoval), exception.suppressed.toList())
+            assertEquals(listOf(DocumentStatus.PENDING), saved.map { it.status })
         }
 
         @Test
@@ -159,13 +179,14 @@ class ArchiveDocumentServiceTest {
         }
 
         @Test
-        fun `a failed final save records the document as failed instead of available`() {
+        fun `a failed final save removes the uploaded content and records the document as failed instead of available`() {
             every { documents.save(match { it.status == DocumentStatus.AVAILABLE }) } throws persistenceFailure
 
             val exception = assertThrows(DocumentPersistenceException::class.java) { service.archive(command()) }
 
             assertSame(persistenceFailure, exception)
             assertEquals(listOf(DocumentStatus.PENDING, DocumentStatus.FAILED), saved.map { it.status })
+            verify { storage.delete(saved.first().file.objectKey) }
         }
 
         @Test

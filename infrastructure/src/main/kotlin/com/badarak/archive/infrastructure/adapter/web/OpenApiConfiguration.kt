@@ -42,8 +42,9 @@ class OpenApiConfiguration {
      */
     @Bean
     fun problemResponses(): OpenApiCustomizer = OpenApiCustomizer { openApi ->
-        val problemSchemas = ModelConverters.getInstance(true).read(ProblemDetail::class.java)
-        problemSchemas.forEach { (name, schema) -> openApi.components.addSchemas(name, schema) }
+        ModelConverters.getInstance(true)
+            .read(ProblemDetail::class.java)
+            .forEach { (name, schema) -> openApi.components.addSchemas(name, schema) }
         openApi.paths.values.flatMap { it.readOperations() }.forEach(::completeResponses)
     }
 

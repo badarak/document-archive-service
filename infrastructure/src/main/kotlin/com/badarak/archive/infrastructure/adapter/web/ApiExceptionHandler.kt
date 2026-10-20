@@ -1,5 +1,6 @@
 package com.badarak.archive.infrastructure.adapter.web
 
+import com.badarak.archive.domain.model.ArchivingAbandonedException
 import com.badarak.archive.domain.model.ContentMismatchException
 import com.badarak.archive.domain.model.ContentTypeMismatchException
 import com.badarak.archive.domain.model.DocumentNotFoundException
@@ -48,6 +49,7 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         is InvalidTenantIdException -> problem(HttpStatus.FORBIDDEN, CALLER_NOT_IDENTIFIED, error.message)
         is DocumentNotFoundException -> problem(HttpStatus.NOT_FOUND, "document-not-found", error.message)
         is InvalidSearchException -> problem(HttpStatus.BAD_REQUEST, "invalid-search", error.message)
+        is ArchivingAbandonedException -> unavailable(error)
         is InvalidStatusTransitionException -> internalError(error)
     }
 
@@ -56,10 +58,7 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         problem(HttpStatus.FORBIDDEN, CALLER_NOT_IDENTIFIED, error.message)
 
     @ExceptionHandler(ObjectStorageException::class, DocumentPersistenceException::class)
-    fun handleUnavailableArchive(error: RuntimeException): ProblemDetail {
-        log.error("Archive unavailable: {}", error.message, error)
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "archive-unavailable", "The archive is temporarily unavailable, retry later")
-    }
+    fun handleUnavailableArchive(error: RuntimeException): ProblemDetail = unavailable(error)
 
     @ExceptionHandler(MissingObjectException::class)
     fun handleMissingContent(error: MissingObjectException): ProblemDetail {
@@ -77,6 +76,11 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         request: WebRequest,
     ): ResponseEntity<Any>? = super.handleMaxUploadSizeExceededException(ex, headers, status, request)
         ?.also { (it.body as? ProblemDetail)?.setProperty(CODE, DOCUMENT_TOO_LARGE) }
+
+    private fun unavailable(error: RuntimeException): ProblemDetail {
+        log.error("Archive unavailable: {}", error.message, error)
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "archive-unavailable", "The archive is temporarily unavailable, retry later")
+    }
 
     private fun internalError(error: Exception): ProblemDetail {
         log.error("Unexpected archiving error: {}", error.message, error)

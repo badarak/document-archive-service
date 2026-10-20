@@ -39,7 +39,8 @@ class AbandonStalledArchivingsServiceTest {
 
     @BeforeEach
     fun acceptEveryWrite() {
-        every { documents.save(capture(saved)) } just runs
+        every { documents.create(capture(saved)) } just runs
+        every { documents.transition(capture(saved), any()) } returns true
         every { storage.delete(any()) } just runs
     }
 
@@ -65,8 +66,18 @@ class AbandonStalledArchivingsServiceTest {
 
         verifyOrder {
             storage.delete(stalled.file.objectKey)
-            documents.save(match { it.status == DocumentStatus.FAILED })
+            documents.transition(match { it.status == DocumentStatus.FAILED }, DocumentStatus.PENDING)
         }
+    }
+
+    @Test
+    fun `an archiving another run abandoned meanwhile is not counted`() {
+        val first = pending("acme")
+        val second = pending("acme")
+        every { documents.findStalled(any(), any(), any()) } returns listOf(first, second)
+        every { documents.transition(match { it.id == second.id }, DocumentStatus.PENDING) } returns false
+
+        assertEquals(1, service.abandon())
     }
 
     @Test
@@ -96,7 +107,7 @@ class AbandonStalledArchivingsServiceTest {
     fun `a document that cannot be recorded as failed is abandoned again at the next call`() {
         val stalled = pending("acme")
         every { documents.findStalled(any(), any(), any()) } returns listOf(stalled)
-        every { documents.save(any()) } throws DocumentPersistenceException("Database down", RuntimeException()) andThen Unit
+        every { documents.transition(any(), any()) } throws DocumentPersistenceException("Database down", RuntimeException()) andThen true
 
         assertThrows(DocumentPersistenceException::class.java) { service.abandon() }
         assertEquals(1, service.abandon())

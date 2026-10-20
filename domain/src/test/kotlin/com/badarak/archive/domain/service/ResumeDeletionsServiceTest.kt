@@ -37,7 +37,8 @@ class ResumeDeletionsServiceTest {
 
     @BeforeEach
     fun acceptEveryWrite() {
-        every { documents.save(capture(saved)) } just runs
+        every { documents.create(capture(saved)) } just runs
+        every { documents.transition(capture(saved), any()) } returns true
         every { storage.delete(any()) } just runs
     }
 
@@ -54,6 +55,16 @@ class ResumeDeletionsServiceTest {
         assertEquals(listOf(first.id, second.id), saved.map { it.id })
         assertEquals(listOf(DocumentStatus.DELETED, DocumentStatus.DELETED), saved.map { it.status })
         assertEquals(now, saved.first().deletedAt)
+    }
+
+    @Test
+    fun `a deletion another run finished meanwhile is not counted`() {
+        val first = deleting("acme")
+        val second = deleting("acme")
+        every { documents.findStalled(any(), any(), any()) } returns listOf(first, second)
+        every { documents.transition(match { it.id == second.id }, DocumentStatus.DELETING) } returns false
+
+        assertEquals(1, service.resume())
     }
 
     @Test

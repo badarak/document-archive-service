@@ -1,6 +1,7 @@
 package com.badarak.archive.infrastructure.adapter.web
 
 import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.model.ArchivingAbandonedException
 import com.badarak.archive.domain.model.ContentMismatchException
 import com.badarak.archive.domain.model.ContentTypeMismatchException
 import com.badarak.archive.domain.model.DocumentFormat
@@ -678,6 +679,7 @@ class DocumentControllerIT {
             Arguments.of(ContentMismatchException(DocumentFormat.PDF), 415, "content-mismatch"),
             Arguments.of(ObjectStorageException("Storage down", RuntimeException()), 503, "archive-unavailable"),
             Arguments.of(DocumentPersistenceException("Database down", RuntimeException()), 503, "archive-unavailable"),
+            Arguments.of(ArchivingAbandonedException(DocumentId.generate()), 503, "archive-unavailable"),
             Arguments.of(InvalidStatusTransitionException(DocumentStatus.AVAILABLE, DocumentStatus.FAILED), 500, "internal-error"),
         )
 

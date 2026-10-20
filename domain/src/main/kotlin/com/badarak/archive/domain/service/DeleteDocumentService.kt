@@ -8,6 +8,10 @@ import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
 import java.time.Clock
 
+/**
+ * Two deletions of the same document may run at once, or a deletion alongside the reconciliation: whichever records it as
+ * DELETING first wins, and both go on to finish it, which is harmless since an AVAILABLE document can only become DELETING.
+ */
 class DeleteDocumentService(private val documents: DocumentRepository, storage: ObjectStorage, private val clock: Clock) :
     DeleteDocumentUseCase {
 
@@ -16,7 +20,7 @@ class DeleteDocumentService(private val documents: DocumentRepository, storage: 
     override fun delete(query: DocumentQuery) {
         val document = documents.findByIdAndTenant(query.id, query.caller.tenantId) ?: throw DocumentNotFoundException(query.id)
         val deleting = when (document.status) {
-            DocumentStatus.AVAILABLE -> document.markDeleting(clock.instant()).also { documents.save(it) }
+            DocumentStatus.AVAILABLE -> document.markDeleting(clock.instant()).also { documents.transition(it, DocumentStatus.AVAILABLE) }
             DocumentStatus.DELETING -> document
             DocumentStatus.DELETED -> return
             DocumentStatus.PENDING, DocumentStatus.FAILED -> throw DocumentNotFoundException(query.id)

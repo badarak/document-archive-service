@@ -29,6 +29,9 @@ class ContentMismatchException(val format: DocumentFormat) : DomainException("Th
 class InvalidTenantIdException(val value: String) :
     DomainException("Invalid tenant identifier '$value': expected 1 to ${TenantId.MAX_LENGTH} characters, not only spaces")
 
+class ArchivingAbandonedException(val id: DocumentId) :
+    DomainException("The archiving of document $id was abandoned before it completed")
+
 class DocumentNotFoundException(val id: DocumentId) : DomainException("Document $id not found")
 
 class InvalidSearchException(val parameter: String, reason: String) : DomainException("Invalid search $parameter: $reason")

@@ -19,6 +19,22 @@ interface DocumentRepository {
     fun save(document: ArchivedDocument)
 
     /**
+     * Inserts [document], which must be new: an existing document is never replaced.
+     *
+     * @throws DocumentPersistenceException when the store cannot be reached, or already holds a document with this identifier
+     */
+    fun create(document: ArchivedDocument)
+
+    /**
+     * Records the status and the dates of [document], provided the stored document is still in status [from]. The check
+     * and the write are a single atomic operation: of two concurrent transitions from the same status, only one applies.
+     *
+     * @return true when the transition was recorded, false when the stored document is no longer in [from] or does not exist
+     * @throws DocumentPersistenceException when the store cannot be reached
+     */
+    fun transition(document: ArchivedDocument, from: DocumentStatus): Boolean
+
+    /**
      * Returns the document with this identifier if it belongs to [tenantId], whatever its status, or null: a document of
      * another tenant is never loaded.
      *

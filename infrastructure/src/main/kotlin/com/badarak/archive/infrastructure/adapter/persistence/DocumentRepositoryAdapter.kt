@@ -38,6 +38,20 @@ class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocume
         }
     }
 
+    override fun create(document: ArchivedDocument) {
+        try {
+            repository.insert(document.toEntity())
+        } catch (e: DataAccessException) {
+            throw DocumentPersistenceException("Could not create document ${document.id}", e)
+        }
+    }
+
+    override fun transition(document: ArchivedDocument, from: DocumentStatus): Boolean = try {
+        repository.updateStatus(document.id.value, from.name, document.status.name, document.updatedAt, document.deletedAt) == 1
+    } catch (e: DataAccessException) {
+        throw DocumentPersistenceException("Could not move document ${document.id} from $from to ${document.status}", e)
+    }
+
     override fun findByIdAndTenant(id: DocumentId, tenantId: TenantId): ArchivedDocument? = try {
         repository.findByIdAndTenantId(id.value, tenantId.value)?.toDomain()
     } catch (e: DataAccessException) {

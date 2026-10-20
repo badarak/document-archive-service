@@ -12,9 +12,12 @@ import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
+import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -76,6 +79,63 @@ class DocumentRepositoryAdapterIT {
         assertEquals("AVAILABLE", stored.status)
         assertEquals(createdAt, stored.createdAt)
         assertEquals(later, stored.updatedAt)
+    }
+
+    @Test
+    fun `a created document is stored with its initial state`() {
+        val document = pendingDocument()
+
+        adapter.create(document)
+
+        val stored = repository.findById(document.id.value).orElseThrow()
+        assertEquals("PENDING", stored.status)
+        assertEquals(document.file.objectKey.value, stored.objectKey)
+        assertEquals(createdAt, stored.updatedAt)
+    }
+
+    @Test
+    fun `creating a document never replaces an existing one`() {
+        val document = pendingDocument()
+        adapter.create(document)
+
+        assertThrows(DocumentPersistenceException::class.java) { adapter.create(document.markAvailable(later)) }
+
+        assertEquals("PENDING", repository.findById(document.id.value).orElseThrow().status)
+    }
+
+    @Test
+    fun `a transition from the stored status is recorded with its dates`() {
+        val document = pendingDocument().markAvailable(later).markDeleting(later)
+        adapter.create(document)
+        val deleted = document.markDeleted(deletedAt)
+
+        assertTrue(adapter.transition(deleted, DocumentStatus.DELETING))
+
+        val stored = repository.findById(document.id.value).orElseThrow()
+        assertEquals("DELETED", stored.status)
+        assertEquals(deletedAt, stored.updatedAt)
+        assertEquals(deletedAt, stored.deletedAt)
+        assertEquals(createdAt, stored.createdAt)
+    }
+
+    @Test
+    fun `a transition from another status than the stored one is not recorded`() {
+        val pending = pendingDocument()
+        adapter.create(pending)
+        assertTrue(adapter.transition(pending.markFailed(later), DocumentStatus.PENDING))
+
+        assertFalse(adapter.transition(pending.markAvailable(deletedAt), DocumentStatus.PENDING))
+
+        val stored = repository.findById(pending.id.value).orElseThrow()
+        assertEquals("FAILED", stored.status)
+        assertEquals(later, stored.updatedAt)
+    }
+
+    @Test
+    fun `a transition of an unknown document is not recorded`() {
+        assertFalse(adapter.transition(pendingDocument().markAvailable(later), DocumentStatus.PENDING))
+
+        assertEquals(0, repository.count())
     }
 
     @Test

@@ -6,13 +6,13 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Encoding
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.core.io.Resource
 import org.springframework.http.MediaType
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.multipart.MultipartFile
-import java.time.Instant
 import java.util.UUID
 import io.swagger.v3.oas.annotations.parameters.RequestBody as OpenApiRequestBody
 
@@ -99,20 +99,8 @@ interface DocumentApi {
         content = [Content(mediaType = PROBLEM, schema = Schema(implementation = ProblemDetail::class))],
     )
     fun search(
-        @Parameter(description = "Exact document type, such as INVOICE")
-        documentType: String?,
-        @Parameter(description = "Exact source, the service that archived the document")
-        source: String?,
-        @Parameter(description = "Exact business reference")
-        businessReference: String?,
-        @Parameter(description = "Earliest creation instant, inclusive, in ISO-8601 with an offset (2026-10-15T14:30:00Z)")
-        createdFrom: Instant?,
-        @Parameter(description = "Latest creation instant, inclusive, in ISO-8601 with an offset (2026-10-15T14:30:00Z)")
-        createdTo: Instant?,
-        @Parameter(description = "Number of the page, from 0", schema = Schema(defaultValue = "0", minimum = "0"))
-        page: Int?,
-        @Parameter(description = "Number of documents per page", schema = Schema(defaultValue = "20", minimum = "1", maximum = "100"))
-        size: Int?,
+        @ParameterObject
+        request: SearchDocumentsRequest,
         @Parameter(hidden = true)
         jwt: Jwt,
     ): DocumentPageResponse

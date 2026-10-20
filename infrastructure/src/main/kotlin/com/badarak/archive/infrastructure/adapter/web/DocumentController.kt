@@ -1,9 +1,6 @@
 package com.badarak.archive.infrastructure.adapter.web
 
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentSearchCriteria
-import com.badarak.archive.domain.model.DocumentType
-import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import com.badarak.archive.domain.port.inbound.DeleteDocumentUseCase
@@ -28,13 +25,11 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 import java.nio.charset.StandardCharsets
-import java.time.Instant
 import java.util.UUID
 
 @Tag(name = "Documents", description = "Archiving of documents sent by other services")
@@ -72,20 +67,9 @@ class DocumentController(
     }
 
     @GetMapping(produces = [MediaType.APPLICATION_JSON_VALUE])
-    override fun search(
-        @RequestParam documentType: String?,
-        @RequestParam source: String?,
-        @RequestParam businessReference: String?,
-        @RequestParam createdFrom: Instant?,
-        @RequestParam createdTo: Instant?,
-        @RequestParam page: Int?,
-        @RequestParam size: Int?,
-        @AuthenticationPrincipal jwt: Jwt,
-    ): DocumentPageResponse {
-        val caller = callerResolver.resolve(jwt)
-        val criteria = DocumentSearchCriteria(documentType?.let(::DocumentType), source, businessReference, createdFrom, createdTo)
-        val request = PageRequest(page ?: PageRequest.FIRST_PAGE, size ?: PageRequest.DEFAULT_SIZE)
-        return DocumentPageResponse.from(searchDocuments.search(DocumentSearchQuery(caller, criteria, request)))
+    override fun search(request: SearchDocumentsRequest, @AuthenticationPrincipal jwt: Jwt): DocumentPageResponse {
+        val query = DocumentSearchQuery(callerResolver.resolve(jwt), request.criteria(), request.pageRequest())
+        return DocumentPageResponse.from(searchDocuments.search(query))
     }
 
     @GetMapping("/{id}", produces = [MediaType.APPLICATION_JSON_VALUE])

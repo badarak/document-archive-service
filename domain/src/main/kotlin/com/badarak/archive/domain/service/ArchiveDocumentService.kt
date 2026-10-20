@@ -46,12 +46,12 @@ class ArchiveDocumentService(
         val stream = file.content.buffered()
         val fileName = FileName.of(file.fileName)
         sizePolicy.check(file.sizeBytes)
-        formatPolicy.check(fileName, file.contentType, readHeader(stream))
+        val mediaType = formatPolicy.check(fileName, file.contentType, readHeader(stream))
         val pending = ArchivedDocument.create(
             id = DocumentId.generate(),
             owner = DocumentOwner(command.caller.tenantId, command.caller.source),
             metadata = command.metadata,
-            file = StoredFile(fileName.value, formatPolicy.mediaType(file.contentType), file.sizeBytes, ObjectKey.generate()),
+            file = StoredFile(fileName.value, mediaType, file.sizeBytes, ObjectKey.generate()),
             now = clock.instant(),
         )
 

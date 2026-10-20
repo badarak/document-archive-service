@@ -2,6 +2,7 @@ package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentNotFoundException
 import com.badarak.archive.domain.model.DocumentOwner
@@ -37,9 +38,11 @@ class DownloadDocumentServiceTest {
         owner = DocumentOwner(TenantId("acme"), "billing-service"),
         metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
         file = StoredFile("invoice.pdf", "application/pdf", 3, key),
-        status = DocumentStatus.AVAILABLE,
-        createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-        updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+        lifecycle = DocumentLifecycle(
+            status = DocumentStatus.AVAILABLE,
+            createdAt = Instant.parse("2026-10-15T09:15:00Z"),
+            updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+        ),
     )
 
     @Test

@@ -2,11 +2,13 @@ package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
+import com.badarak.archive.domain.model.StalledDocumentsPolicy
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentRepository
@@ -32,7 +34,8 @@ class ResumeDeletionsServiceTest {
     private val storage = mockk<ObjectStorage>()
     private val now = Instant.parse("2026-10-19T10:00:00Z")
     private val gracePeriod = Duration.ofMinutes(15)
-    private val service = ResumeDeletionsService(documents, storage, Clock.fixed(now, ZoneOffset.UTC), gracePeriod, 2)
+    private val policy = StalledDocumentsPolicy(gracePeriod, 2)
+    private val service = ResumeDeletionsService(documents, storage, Clock.fixed(now, ZoneOffset.UTC), policy)
     private val saved = mutableListOf<ArchivedDocument>()
 
     @BeforeEach
@@ -90,21 +93,15 @@ class ResumeDeletionsServiceTest {
         verify(exactly = 0) { storage.delete(third.file.objectKey) }
     }
 
-    @Test
-    fun `refuses a negative grace period or a batch size that is not positive`() {
-        assertThrows(IllegalArgumentException::class.java) {
-            ResumeDeletionsService(documents, storage, Clock.systemUTC(), Duration.ofMinutes(-1), 2)
-        }
-        assertThrows(IllegalArgumentException::class.java) { ResumeDeletionsService(documents, storage, Clock.systemUTC(), gracePeriod, 0) }
-    }
-
     private fun deleting(tenant: String) = ArchivedDocument(
         id = DocumentId.generate(),
         owner = DocumentOwner(TenantId(tenant), "billing-service"),
         metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
         file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        status = DocumentStatus.DELETING,
-        createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-        updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+        lifecycle = DocumentLifecycle(
+            status = DocumentStatus.DELETING,
+            createdAt = Instant.parse("2026-10-15T09:15:00Z"),
+            updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
+        ),
     )
 }

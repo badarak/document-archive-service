@@ -2,6 +2,7 @@ package com.badarak.archive.infrastructure.config
 
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentSizePolicy
+import com.badarak.archive.domain.model.StalledDocumentsPolicy
 import com.badarak.archive.domain.port.inbound.AbandonStalledArchivingsUseCase
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import com.badarak.archive.domain.port.inbound.DeleteDocumentUseCase
@@ -59,27 +60,29 @@ class ArchivingConfiguration {
         DeleteDocumentService(documents, storage, clock)
 
     @Bean
+    fun stalledDocumentsPolicy(properties: ReconciliationProperties, storageProperties: S3StorageProperties): StalledDocumentsPolicy {
+        require(properties.gracePeriod > storageProperties.apiCallTimeout) {
+            "archive.reconciliation.grace-period (${properties.gracePeriod}) must exceed archive.storage.s3.api-call-timeout " +
+                "(${storageProperties.apiCallTimeout}), so that no upload is still running when its archiving is abandoned"
+        }
+        return StalledDocumentsPolicy(properties.gracePeriod, properties.batchSize)
+    }
+
+    @Bean
     fun resumeDeletionsUseCase(
         documents: DocumentRepository,
         storage: ObjectStorage,
         clock: Clock,
-        properties: ReconciliationProperties,
-    ): ResumeDeletionsUseCase = ResumeDeletionsService(documents, storage, clock, properties.gracePeriod, properties.batchSize)
+        policy: StalledDocumentsPolicy,
+    ): ResumeDeletionsUseCase = ResumeDeletionsService(documents, storage, clock, policy)
 
     @Bean
     fun abandonStalledArchivingsUseCase(
         documents: DocumentRepository,
         storage: ObjectStorage,
         clock: Clock,
-        properties: ReconciliationProperties,
-        storageProperties: S3StorageProperties,
-    ): AbandonStalledArchivingsUseCase {
-        require(properties.gracePeriod > storageProperties.apiCallTimeout) {
-            "archive.reconciliation.grace-period (${properties.gracePeriod}) must exceed archive.storage.s3.api-call-timeout " +
-                "(${storageProperties.apiCallTimeout}), so that no upload is still running when its archiving is abandoned"
-        }
-        return AbandonStalledArchivingsService(documents, storage, clock, properties.gracePeriod, properties.batchSize)
-    }
+        policy: StalledDocumentsPolicy,
+    ): AbandonStalledArchivingsUseCase = AbandonStalledArchivingsService(documents, storage, clock, policy)
 
     @Bean
     fun searchDocumentsUseCase(documents: DocumentRepository): SearchDocumentsUseCase = SearchDocumentsService(documents)

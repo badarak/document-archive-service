@@ -118,6 +118,11 @@ document: the service removes whatever content reached the storage and records t
 period is over. The grace period must therefore exceed `ARCHIVE_S3_API_CALL_TIMEOUT`, the longest an
 upload can take, or the application does not start.
 
+Every status change is recorded only if the document is still in the status it leaves, in a single
+statement: of two concurrent changes, such as a deletion replayed during the reconciliation, only
+one applies. An upload that completes after its archiving was abandoned removes its content and is
+answered with `503` instead of making the document `AVAILABLE`.
+
 ## Security
 
 The service is an OAuth2 resource server: callers authenticate with a JWT access token sent in the

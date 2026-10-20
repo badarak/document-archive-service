@@ -24,7 +24,6 @@ class AbandonStalledArchivingsService(
 
     override fun abandon(): Int {
         val stalled = documents.findStalled(DocumentStatus.PENDING, clock.instant().minus(gracePeriod), batchSize)
-        stalled.forEach(failure::record)
-        return stalled.size
+        return stalled.count(failure::record)
     }
 }

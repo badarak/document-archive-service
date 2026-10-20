@@ -12,9 +12,12 @@ import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
+import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -45,7 +48,7 @@ class DocumentRepositoryAdapterIT {
     fun `a new document is stored with all its metadata`() {
         val document = pendingDocument()
 
-        adapter.save(document)
+        adapter.create(document)
 
         val stored = repository.findById(document.id.value).orElseThrow()
         assertEquals("acme", stored.tenantId)
@@ -65,23 +68,54 @@ class DocumentRepositoryAdapterIT {
     }
 
     @Test
-    fun `saving a document again replaces its state`() {
-        val pending = pendingDocument()
-        adapter.save(pending)
+    fun `creating a document never replaces an existing one`() {
+        val document = pendingDocument()
+        adapter.create(document)
 
-        adapter.save(pending.markAvailable(later))
+        assertThrows(DocumentPersistenceException::class.java) { adapter.create(document.markAvailable(later)) }
+
+        assertEquals("PENDING", repository.findById(document.id.value).orElseThrow().status)
+    }
+
+    @Test
+    fun `a transition from the stored status is recorded with its dates`() {
+        val document = pendingDocument().markAvailable(later).markDeleting(later)
+        adapter.create(document)
+        val deleted = document.markDeleted(deletedAt)
+
+        assertTrue(adapter.transition(deleted, DocumentStatus.DELETING))
+
+        val stored = repository.findById(document.id.value).orElseThrow()
+        assertEquals("DELETED", stored.status)
+        assertEquals(deletedAt, stored.updatedAt)
+        assertEquals(deletedAt, stored.deletedAt)
+        assertEquals(createdAt, stored.createdAt)
+    }
+
+    @Test
+    fun `a transition from another status than the stored one is not recorded`() {
+        val pending = pendingDocument()
+        adapter.create(pending)
+        assertTrue(adapter.transition(pending.markFailed(later), DocumentStatus.PENDING))
+
+        assertFalse(adapter.transition(pending.markAvailable(deletedAt), DocumentStatus.PENDING))
 
         val stored = repository.findById(pending.id.value).orElseThrow()
-        assertEquals(1, repository.count())
-        assertEquals("AVAILABLE", stored.status)
-        assertEquals(createdAt, stored.createdAt)
+        assertEquals("FAILED", stored.status)
         assertEquals(later, stored.updatedAt)
+    }
+
+    @Test
+    fun `a transition of an unknown document is not recorded`() {
+        assertFalse(adapter.transition(pendingDocument().markAvailable(later), DocumentStatus.PENDING))
+
+        assertEquals(0, repository.count())
     }
 
     @Test
     fun `a stored document is read back with all its fields for its tenant`() {
         val document = pendingDocument().markAvailable(later)
-        adapter.save(document)
+        adapter.create(document)
 
         val found = adapter.findByIdAndTenant(document.id, TenantId("acme"))!!
 
@@ -100,7 +134,7 @@ class DocumentRepositoryAdapterIT {
     @Test
     fun `a deleted document is stored and read back with its deletion date`() {
         val deleted = pendingDocument().markAvailable(later).markDeleting(later).markDeleted(deletedAt)
-        adapter.save(deleted)
+        adapter.create(deleted)
 
         val found = adapter.findByIdAndTenant(deleted.id, TenantId("acme"))!!
 
@@ -112,7 +146,7 @@ class DocumentRepositoryAdapterIT {
     @Test
     fun `a document of another tenant is not found`() {
         val document = pendingDocument()
-        adapter.save(document)
+        adapter.create(document)
 
         assertNull(adapter.findByIdAndTenant(document.id, TenantId("globex")))
     }
@@ -223,7 +257,7 @@ class DocumentRepositoryAdapterIT {
         status = status,
         createdAt = createdAt,
         updatedAt = createdAt,
-    ).also { adapter.save(it) }
+    ).also { adapter.create(it) }
 
     private fun pendingDocument(): ArchivedDocument = ArchivedDocument.create(
         id = DocumentId.generate(),

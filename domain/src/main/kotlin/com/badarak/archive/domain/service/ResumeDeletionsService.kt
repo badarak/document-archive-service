@@ -24,7 +24,6 @@ class ResumeDeletionsService(
 
     override fun resume(): Int {
         val stalled = documents.findStalled(DocumentStatus.DELETING, clock.instant().minus(gracePeriod), batchSize)
-        stalled.forEach(deletion::finish)
-        return stalled.size
+        return stalled.count(deletion::finish)
     }
 }

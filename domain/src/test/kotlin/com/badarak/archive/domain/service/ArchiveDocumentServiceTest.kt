@@ -1,6 +1,7 @@
 package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.model.ArchivingAbandonedException
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentSizePolicy
@@ -56,7 +57,8 @@ class ArchiveDocumentServiceTest {
 
     @BeforeEach
     fun acceptEveryCall() {
-        every { documents.save(capture(saved)) } just Runs
+        every { documents.create(capture(saved)) } just Runs
+        every { documents.transition(capture(saved), any()) } returns true
         every { storage.store(any(), any(), any(), any()) } answers { uploaded = secondArg<InputStream>().readAllBytes() }
         every { storage.delete(any()) } just Runs
     }
@@ -71,6 +73,7 @@ class ArchiveDocumentServiceTest {
             assertEquals(listOf(DocumentStatus.PENDING, DocumentStatus.AVAILABLE), saved.map { it.status })
             assertEquals(DocumentStatus.AVAILABLE, document.status)
             assertSame(saved.last(), document)
+            verify { documents.transition(document, DocumentStatus.PENDING) }
             assertArrayEquals(content, uploaded)
             verify { storage.store(document.file.objectKey, any(), content.size.toLong(), "application/pdf") }
         }
@@ -118,7 +121,7 @@ class ArchiveDocumentServiceTest {
         }
 
         private fun assertNothingWritten() {
-            verify(exactly = 0) { documents.save(any()) }
+            verify(exactly = 0) { documents.create(any()) }
             verify(exactly = 0) { storage.store(any(), any(), any(), any()) }
         }
     }
@@ -131,7 +134,7 @@ class ArchiveDocumentServiceTest {
 
         @Test
         fun `nothing is uploaded when the pending document cannot be recorded`() {
-            every { documents.save(any()) } throws persistenceFailure
+            every { documents.create(any()) } throws persistenceFailure
 
             val exception = assertThrows(DocumentPersistenceException::class.java) { service.archive(command()) }
 
@@ -150,7 +153,7 @@ class ArchiveDocumentServiceTest {
             assertEquals(listOf(DocumentStatus.PENDING, DocumentStatus.FAILED), saved.map { it.status })
             verifyOrder {
                 storage.delete(saved.first().file.objectKey)
-                documents.save(match { it.status == DocumentStatus.FAILED })
+                documents.transition(match { it.status == DocumentStatus.FAILED }, DocumentStatus.PENDING)
             }
         }
 
@@ -170,7 +173,7 @@ class ArchiveDocumentServiceTest {
         @Test
         fun `a failed upload leaves the document pending when it cannot be recorded as failed`() {
             every { storage.store(any(), any(), any(), any()) } throws storageFailure
-            every { documents.save(match { it.status == DocumentStatus.FAILED }) } throws persistenceFailure
+            every { documents.transition(match { it.status == DocumentStatus.FAILED }, DocumentStatus.PENDING) } throws persistenceFailure
 
             val exception = assertThrows(ObjectStorageException::class.java) { service.archive(command()) }
 
@@ -180,7 +183,7 @@ class ArchiveDocumentServiceTest {
 
         @Test
         fun `a failed final save removes the uploaded content and records the document as failed instead of available`() {
-            every { documents.save(match { it.status == DocumentStatus.AVAILABLE }) } throws persistenceFailure
+            every { documents.transition(match { it.status == DocumentStatus.AVAILABLE }, any()) } throws persistenceFailure
 
             val exception = assertThrows(DocumentPersistenceException::class.java) { service.archive(command()) }
 
@@ -190,10 +193,31 @@ class ArchiveDocumentServiceTest {
         }
 
         @Test
+        fun `an archiving abandoned during its upload removes the uploaded content and is refused`() {
+            every { documents.transition(match { it.status == DocumentStatus.AVAILABLE }, DocumentStatus.PENDING) } returns false
+
+            val exception = assertThrows(ArchivingAbandonedException::class.java) { service.archive(command()) }
+
+            assertEquals(saved.single().id, exception.id)
+            verify { storage.delete(saved.single().file.objectKey) }
+            verify(exactly = 0) { documents.transition(match { it.status == DocumentStatus.FAILED }, any()) }
+        }
+
+        @Test
+        fun `an abandoned archiving whose content cannot be removed keeps the storage error as suppressed`() {
+            every { documents.transition(match { it.status == DocumentStatus.AVAILABLE }, DocumentStatus.PENDING) } returns false
+            every { storage.delete(any()) } throws storageFailure
+
+            val exception = assertThrows(ArchivingAbandonedException::class.java) { service.archive(command()) }
+
+            assertEquals(listOf(storageFailure), exception.suppressed.toList())
+        }
+
+        @Test
         fun `a failed final save leaves the document pending when it cannot be recorded as failed`() {
             val failedSave = DocumentPersistenceException("Database still unavailable", RuntimeException("Connection refused"))
-            every { documents.save(match { it.status == DocumentStatus.AVAILABLE }) } throws persistenceFailure
-            every { documents.save(match { it.status == DocumentStatus.FAILED }) } throws failedSave
+            every { documents.transition(match { it.status == DocumentStatus.AVAILABLE }, any()) } throws persistenceFailure
+            every { documents.transition(match { it.status == DocumentStatus.FAILED }, DocumentStatus.PENDING) } throws failedSave
 
             val exception = assertThrows(DocumentPersistenceException::class.java) { service.archive(command()) }
 

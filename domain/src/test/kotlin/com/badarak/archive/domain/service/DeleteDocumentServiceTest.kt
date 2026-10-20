@@ -47,7 +47,8 @@ class DeleteDocumentServiceTest {
 
     @BeforeEach
     fun acceptEveryWrite() {
-        every { documents.save(capture(saved)) } just runs
+        every { documents.create(capture(saved)) } just runs
+        every { documents.transition(capture(saved), any()) } returns true
         every { storage.delete(any()) } just runs
     }
 
@@ -58,9 +59,9 @@ class DeleteDocumentServiceTest {
         service.delete(query)
 
         verifyOrder {
-            documents.save(match { it.status == DocumentStatus.DELETING })
+            documents.transition(match { it.status == DocumentStatus.DELETING }, DocumentStatus.AVAILABLE)
             storage.delete(key)
-            documents.save(match { it.status == DocumentStatus.DELETED })
+            documents.transition(match { it.status == DocumentStatus.DELETED }, DocumentStatus.DELETING)
         }
         assertEquals(listOf(DocumentStatus.DELETING, DocumentStatus.DELETED), saved.map { it.status })
         assertEquals(now, saved.last().deletedAt)
@@ -84,7 +85,7 @@ class DeleteDocumentServiceTest {
         service.delete(query)
 
         verify(exactly = 0) { storage.delete(any()) }
-        verify(exactly = 0) { documents.save(any()) }
+        verify(exactly = 0) { documents.transition(any(), any()) }
     }
 
     @Test
@@ -105,7 +106,18 @@ class DeleteDocumentServiceTest {
         assertThrows(DocumentNotFoundException::class.java) { service.delete(query) }
 
         verify(exactly = 0) { storage.delete(any()) }
-        verify(exactly = 0) { documents.save(any()) }
+        verify(exactly = 0) { documents.transition(any(), any()) }
+    }
+
+    @Test
+    fun `a deletion that another one recorded as deleting first still finishes the document`() {
+        every { documents.findByIdAndTenant(id, TenantId("acme")) } returns document(DocumentStatus.AVAILABLE)
+        every { documents.transition(match { it.status == DocumentStatus.DELETING }, DocumentStatus.AVAILABLE) } returns false
+
+        service.delete(query)
+
+        verify { storage.delete(key) }
+        verify { documents.transition(match { it.status == DocumentStatus.DELETED }, DocumentStatus.DELETING) }
     }
 
     @Test
@@ -122,7 +134,7 @@ class DeleteDocumentServiceTest {
     @Test
     fun `when the document cannot be recorded as deleting, its content is kept`() {
         every { documents.findByIdAndTenant(id, TenantId("acme")) } returns document(DocumentStatus.AVAILABLE)
-        every { documents.save(any()) } throws DocumentPersistenceException("Database down", RuntimeException())
+        every { documents.transition(any(), any()) } throws DocumentPersistenceException("Database down", RuntimeException())
 
         assertThrows(DocumentPersistenceException::class.java) { service.delete(query) }
 

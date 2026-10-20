@@ -35,13 +35,25 @@ class DocumentRepositoryAdapterTest {
     @Test
     fun `a database failure becomes a document persistence error`() {
         val failure = DataAccessResourceFailureException("Connection refused")
-        every { repository.save(any()) } throws failure
+        every { repository.save(any<ArchivedDocumentEntity>()) } throws failure
         val document = document()
 
-        val exception = assertThrows(DocumentPersistenceException::class.java) { adapter.save(document) }
+        val exception = assertThrows(DocumentPersistenceException::class.java) { adapter.create(document) }
 
         assertSame(failure, exception.cause)
-        assertEquals("Could not save document ${document.id}", exception.message)
+        assertEquals("Could not create document ${document.id}", exception.message)
+    }
+
+    @Test
+    fun `a database failure during a transition becomes a document persistence error`() {
+        val failure = DataAccessResourceFailureException("Connection refused")
+        every { repository.updateStatus(any(), any(), any(), any(), any()) } throws failure
+
+        val exception = assertThrows(DocumentPersistenceException::class.java) {
+            adapter.transition(document().markAvailable(Instant.parse("2026-10-14T09:16:00Z")), DocumentStatus.PENDING)
+        }
+
+        assertSame(failure, exception.cause)
     }
 
     @Test
@@ -71,22 +83,22 @@ class DocumentRepositoryAdapterTest {
     @Test
     fun `a stored row that breaks a domain rule becomes a document persistence error`() {
         val row = entity(documentType = "invoice")
-        every { repository.findByIdAndTenantId(row.id, "acme") } returns row
+        every { repository.findByIdAndTenantId(row.getId(), "acme") } returns row
 
         val exception = assertThrows(DocumentPersistenceException::class.java) {
-            adapter.findByIdAndTenant(DocumentId(row.id), TenantId("acme"))
+            adapter.findByIdAndTenant(DocumentId(row.getId()), TenantId("acme"))
         }
 
-        assertEquals("Document ${row.id} is stored in an invalid state", exception.message)
+        assertEquals("Document ${row.getId()} is stored in an invalid state", exception.message)
         assertTrue(exception.cause is InvalidDocumentTypeException)
     }
 
     @Test
     fun `a stored row with an unknown status becomes a document persistence error`() {
         val row = entity(status = "ARCHIVED")
-        every { repository.findByIdAndTenantId(row.id, "acme") } returns row
+        every { repository.findByIdAndTenantId(row.getId(), "acme") } returns row
 
-        assertThrows(DocumentPersistenceException::class.java) { adapter.findByIdAndTenant(DocumentId(row.id), TenantId("acme")) }
+        assertThrows(DocumentPersistenceException::class.java) { adapter.findByIdAndTenant(DocumentId(row.getId()), TenantId("acme")) }
     }
 
     private fun entity(documentType: String = "INVOICE", status: String = "AVAILABLE") = ArchivedDocumentEntity(

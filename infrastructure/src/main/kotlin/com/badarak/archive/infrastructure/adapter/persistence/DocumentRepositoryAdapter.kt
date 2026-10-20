@@ -30,12 +30,18 @@ import org.springframework.data.domain.PageRequest as SpringPageRequest
 @Repository
 class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocumentRepository) : DocumentRepository {
 
-    override fun save(document: ArchivedDocument) {
+    override fun create(document: ArchivedDocument) {
         try {
             repository.save(document.toEntity())
         } catch (e: DataAccessException) {
-            throw DocumentPersistenceException("Could not save document ${document.id}", e)
+            throw DocumentPersistenceException("Could not create document ${document.id}", e)
         }
+    }
+
+    override fun transition(document: ArchivedDocument, from: DocumentStatus): Boolean = try {
+        repository.updateStatus(document.id.value, from.name, document.status.name, document.updatedAt, document.deletedAt) == 1
+    } catch (e: DataAccessException) {
+        throw DocumentPersistenceException("Could not move document ${document.id} from $from to ${document.status}", e)
     }
 
     override fun findByIdAndTenant(id: DocumentId, tenantId: TenantId): ArchivedDocument? = try {
@@ -96,7 +102,7 @@ private fun ArchivedDocument.toEntity(): ArchivedDocumentEntity = ArchivedDocume
 
 private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = try {
     ArchivedDocument(
-        id = DocumentId(id),
+        id = DocumentId(getId()),
         owner = DocumentOwner(TenantId(tenantId), source),
         metadata = DocumentMetadata(DocumentType(documentType), businessReference, description, tags),
         file = StoredFile(fileName, contentType, sizeBytes, ObjectKey(objectKey)),
@@ -106,5 +112,5 @@ private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = try {
         deletedAt = deletedAt,
     )
 } catch (e: RuntimeException) {
-    throw DocumentPersistenceException("Document $id is stored in an invalid state", e)
+    throw DocumentPersistenceException("Document ${getId()} is stored in an invalid state", e)
 }

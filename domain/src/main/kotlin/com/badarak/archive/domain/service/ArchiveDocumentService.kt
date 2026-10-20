@@ -1,11 +1,13 @@
 package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.model.ArchivingAbandonedException
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
+import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.FileName
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.StoredFile
@@ -25,8 +27,9 @@ import java.time.Clock
  * A refused document leaves no trace. When the upload or the final save fails, whatever content
  * reached the storage is removed, the document is recorded as FAILED and the error is rethrown; if
  * the removal or that save fails too, its error is attached to the original one as suppressed and
- * the document stays PENDING until it is abandoned. A document is never AVAILABLE without its
- * content, nor FAILED with one.
+ * the document stays PENDING until it is abandoned. If the document was abandoned while its
+ * content was uploading, that content is removed and [ArchivingAbandonedException] is thrown. A
+ * document is never AVAILABLE without its content, nor FAILED with one.
  */
 class ArchiveDocumentService(
     private val documents: DocumentRepository,
@@ -53,7 +56,7 @@ class ArchiveDocumentService(
             now = clock.instant(),
         )
 
-        documents.save(pending)
+        documents.create(pending)
         try {
             storage.store(pending.file.objectKey, stream, pending.file.sizeBytes, pending.file.contentType)
         } catch (e: ObjectStorageException) {
@@ -61,13 +64,24 @@ class ArchiveDocumentService(
             throw e
         }
         val available = pending.markAvailable(clock.instant())
-        try {
-            documents.save(available)
+        val recorded = try {
+            documents.transition(available, DocumentStatus.PENDING)
         } catch (e: DocumentPersistenceException) {
             recordFailure(pending, e)
             throw e
         }
+        if (!recorded) throw abandoned(pending)
         return available
+    }
+
+    private fun abandoned(pending: ArchivedDocument): ArchivingAbandonedException {
+        val error = ArchivingAbandonedException(pending.id)
+        try {
+            storage.delete(pending.file.objectKey)
+        } catch (e: ObjectStorageException) {
+            error.addSuppressed(e)
+        }
+        return error
     }
 
     private fun readHeader(stream: InputStream): ByteArray {

@@ -50,7 +50,32 @@ class OpenApiDocumentationIT {
     }
 
     @Test
+    fun `every error answer is described as Problem Details, with the 401 and 500 answers shared by every operation`() {
+        val document = "$.paths['/api/v1/documents/{id}']"
+        mockMvc.get("/v3/api-docs").andExpect {
+            status { isOk() }
+            jsonPath("$.components.schemas.ProblemDetail") { exists() }
+            jsonPath("$document.get.responses['404'].content['application/problem+json'].schema['\$ref']") { value(PROBLEM_DETAIL) }
+            jsonPath("$document.get.responses['404'].content['application/json']") { doesNotExist() }
+            jsonPath("$document.get.responses['200'].content['application/json'].schema['\$ref']") {
+                value("#/components/schemas/ArchivedDocument")
+            }
+            jsonPath("$document.delete.responses['401'].description") { value("Missing, invalid or expired access token") }
+            jsonPath("$document.delete.responses['401'].content['application/problem+json'].schema['\$ref']") { value(PROBLEM_DETAIL) }
+            jsonPath("$document.delete.responses['500'].description") { value("Unexpected error") }
+            jsonPath("$['paths']['/api/v1/documents/{id}/content'].get.responses['500'].description") {
+                value("The document's content is missing from the storage")
+            }
+            jsonPath("$['paths']['/api/v1/documents/{id}/content'].get.responses['403'].content['application/problem+json']") { exists() }
+        }
+    }
+
+    @Test
     fun `the Swagger UI is served without token`() {
         mockMvc.get("/swagger-ui/index.html").andExpect { status { isOk() } }
+    }
+
+    companion object {
+        private const val PROBLEM_DETAIL = "#/components/schemas/ProblemDetail"
     }
 }

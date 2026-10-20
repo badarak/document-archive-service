@@ -319,7 +319,7 @@ class DocumentJourneyIT {
             clock.set(START.plus(Duration.ofMinutes(16)))
             assertEquals(1, abandonArchivings.abandon())
 
-            assertEquals("FAILED", row(pending.id.toString()).status)
+            assertEquals("FAILED", row(pending.getId().toString()).status)
             assertTrue(storage.keys().isEmpty())
         }
 

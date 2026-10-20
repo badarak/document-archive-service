@@ -32,7 +32,7 @@ class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocume
 
     override fun create(document: ArchivedDocument) {
         try {
-            repository.insert(document.toEntity())
+            repository.save(document.toEntity())
         } catch (e: DataAccessException) {
             throw DocumentPersistenceException("Could not create document ${document.id}", e)
         }
@@ -102,7 +102,7 @@ private fun ArchivedDocument.toEntity(): ArchivedDocumentEntity = ArchivedDocume
 
 private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = try {
     ArchivedDocument(
-        id = DocumentId(id),
+        id = DocumentId(getId()),
         owner = DocumentOwner(TenantId(tenantId), source),
         metadata = DocumentMetadata(DocumentType(documentType), businessReference, description, tags),
         file = StoredFile(fileName, contentType, sizeBytes, ObjectKey(objectKey)),
@@ -112,5 +112,5 @@ private fun ArchivedDocumentEntity.toDomain(): ArchivedDocument = try {
         deletedAt = deletedAt,
     )
 } catch (e: RuntimeException) {
-    throw DocumentPersistenceException("Document $id is stored in an invalid state", e)
+    throw DocumentPersistenceException("Document ${getId()} is stored in an invalid state", e)
 }

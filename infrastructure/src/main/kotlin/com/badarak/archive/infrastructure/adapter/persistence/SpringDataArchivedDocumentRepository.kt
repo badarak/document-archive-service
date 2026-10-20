@@ -11,8 +11,7 @@ import java.util.UUID
 
 interface SpringDataArchivedDocumentRepository :
     JpaRepository<ArchivedDocumentEntity, UUID>,
-    JpaSpecificationExecutor<ArchivedDocumentEntity>,
-    ArchivedDocumentInsertion {
+    JpaSpecificationExecutor<ArchivedDocumentEntity> {
 
     fun findByIdAndTenantId(id: UUID, tenantId: String): ArchivedDocumentEntity?
 

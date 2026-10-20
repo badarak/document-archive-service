@@ -35,7 +35,7 @@ class DocumentRepositoryAdapterTest {
     @Test
     fun `a database failure becomes a document persistence error`() {
         val failure = DataAccessResourceFailureException("Connection refused")
-        every { repository.insert(any()) } throws failure
+        every { repository.save(any<ArchivedDocumentEntity>()) } throws failure
         val document = document()
 
         val exception = assertThrows(DocumentPersistenceException::class.java) { adapter.create(document) }
@@ -83,22 +83,22 @@ class DocumentRepositoryAdapterTest {
     @Test
     fun `a stored row that breaks a domain rule becomes a document persistence error`() {
         val row = entity(documentType = "invoice")
-        every { repository.findByIdAndTenantId(row.id, "acme") } returns row
+        every { repository.findByIdAndTenantId(row.getId(), "acme") } returns row
 
         val exception = assertThrows(DocumentPersistenceException::class.java) {
-            adapter.findByIdAndTenant(DocumentId(row.id), TenantId("acme"))
+            adapter.findByIdAndTenant(DocumentId(row.getId()), TenantId("acme"))
         }
 
-        assertEquals("Document ${row.id} is stored in an invalid state", exception.message)
+        assertEquals("Document ${row.getId()} is stored in an invalid state", exception.message)
         assertTrue(exception.cause is InvalidDocumentTypeException)
     }
 
     @Test
     fun `a stored row with an unknown status becomes a document persistence error`() {
         val row = entity(status = "ARCHIVED")
-        every { repository.findByIdAndTenantId(row.id, "acme") } returns row
+        every { repository.findByIdAndTenantId(row.getId(), "acme") } returns row
 
-        assertThrows(DocumentPersistenceException::class.java) { adapter.findByIdAndTenant(DocumentId(row.id), TenantId("acme")) }
+        assertThrows(DocumentPersistenceException::class.java) { adapter.findByIdAndTenant(DocumentId(row.getId()), TenantId("acme")) }
     }
 
     private fun entity(documentType: String = "INVOICE", status: String = "AVAILABLE") = ArchivedDocumentEntity(

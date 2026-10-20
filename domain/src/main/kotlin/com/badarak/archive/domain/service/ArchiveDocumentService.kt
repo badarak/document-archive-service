@@ -52,7 +52,6 @@ class ArchiveDocumentService(
             owner = DocumentOwner(command.caller.tenantId, command.caller.source),
             metadata = command.metadata,
             file = StoredFile(fileName.value, formatPolicy.mediaType(file.contentType), file.sizeBytes, ObjectKey.generate()),
-            sizePolicy = sizePolicy,
             now = clock.instant(),
         )
 

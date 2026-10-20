@@ -39,13 +39,6 @@ class ArchivedDocumentTest {
             assertEquals(createdAt, document.createdAt)
             assertEquals(createdAt, document.updatedAt)
         }
-
-        @Test
-        fun `a document above the size limit is refused`() {
-            assertThrows(DocumentTooLargeException::class.java) {
-                newDocument(file = file.copy(sizeBytes = 1_001), sizePolicy = DocumentSizePolicy(maxSizeBytes = 1_000))
-            }
-        }
     }
 
     @Nested
@@ -160,11 +153,8 @@ class ArchivedDocumentTest {
         }
     }
 
-    private fun newDocument(
-        id: DocumentId = DocumentId.generate(),
-        file: StoredFile = this.file,
-        sizePolicy: DocumentSizePolicy = DocumentSizePolicy(),
-    ): ArchivedDocument = ArchivedDocument.create(id, owner, metadata, file, sizePolicy, createdAt)
+    private fun newDocument(id: DocumentId = DocumentId.generate()): ArchivedDocument =
+        ArchivedDocument.create(id, owner, metadata, file, createdAt)
 
     private fun existingDocument(status: DocumentStatus): ArchivedDocument = ArchivedDocument(
         DocumentId.generate(),

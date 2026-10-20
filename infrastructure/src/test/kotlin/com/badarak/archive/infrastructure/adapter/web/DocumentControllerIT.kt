@@ -12,7 +12,6 @@ import com.badarak.archive.domain.model.DocumentNotFoundException
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentPage
 import com.badarak.archive.domain.model.DocumentSearchCriteria
-import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentTooLargeException
 import com.badarak.archive.domain.model.DocumentType
@@ -635,7 +634,6 @@ class DocumentControllerIT {
         owner = DocumentOwner(TenantId("acme"), "billing-service"),
         metadata = metadata,
         file = StoredFile("invoice-123.pdf", "application/pdf", content.size.toLong(), ObjectKey.generate()),
-        sizePolicy = DocumentSizePolicy(),
         now = Instant.parse("2026-10-15T09:15:00Z"),
     ).markAvailable(Instant.parse("2026-10-15T09:15:00Z"))
 

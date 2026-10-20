@@ -9,6 +9,7 @@ import java.time.Instant
  * the consistency of the dates. The status and the dates are also exposed directly, for readability.
  *
  * The constructor rebuilds a document in any valid state (for instance from persistence); use [create] to archive a new one.
+ * Which documents may be archived (size, format) is decided by the archiving use case, not by the document itself.
  */
 class ArchivedDocument(
     val id: DocumentId,
@@ -44,16 +45,7 @@ class ArchivedDocument(
     override fun toString(): String = "ArchivedDocument(id=$id, documentType=${metadata.documentType}, status=$status)"
 
     companion object {
-        fun create(
-            id: DocumentId,
-            owner: DocumentOwner,
-            metadata: DocumentMetadata,
-            file: StoredFile,
-            sizePolicy: DocumentSizePolicy,
-            now: Instant,
-        ): ArchivedDocument {
-            sizePolicy.check(file.sizeBytes)
-            return ArchivedDocument(id, owner, metadata, file, DocumentLifecycle.start(now))
-        }
+        fun create(id: DocumentId, owner: DocumentOwner, metadata: DocumentMetadata, file: StoredFile, now: Instant): ArchivedDocument =
+            ArchivedDocument(id, owner, metadata, file, DocumentLifecycle.start(now))
     }
 }

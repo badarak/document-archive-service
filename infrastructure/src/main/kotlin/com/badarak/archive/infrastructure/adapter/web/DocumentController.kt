@@ -1,11 +1,9 @@
 package com.badarak.archive.infrastructure.adapter.web
 
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentSearchCriteria
-import com.badarak.archive.domain.model.DocumentType
-import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.inbound.AuthenticatedCaller
 import com.badarak.archive.domain.port.inbound.DeleteDocumentUseCase
 import com.badarak.archive.domain.port.inbound.DocumentQuery
 import com.badarak.archive.domain.port.inbound.DocumentSearchQuery
@@ -21,20 +19,16 @@ import org.springframework.http.ContentDisposition
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 import java.nio.charset.StandardCharsets
-import java.time.Instant
 import java.util.UUID
 
 @Tag(name = "Documents", description = "Archiving of documents sent by other services")
@@ -47,16 +41,14 @@ class DocumentController(
     private val downloadDocument: DownloadDocumentUseCase,
     private val searchDocuments: SearchDocumentsUseCase,
     private val deleteDocument: DeleteDocumentUseCase,
-    private val callerResolver: JwtCallerResolver,
 ) : DocumentApi {
 
     @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE], produces = [MediaType.APPLICATION_JSON_VALUE])
     override fun archive(
         @RequestPart("file") file: MultipartFile,
         @RequestPart("metadata") metadata: ArchiveMetadataRequest,
-        @AuthenticationPrincipal jwt: Jwt,
+        caller: AuthenticatedCaller,
     ): ResponseEntity<ArchivedDocumentResponse> {
-        val caller = callerResolver.resolve(jwt)
         val documentMetadata = metadata.toDomain()
         val document = file.inputStream.use { content ->
             archiveDocument.archive(
@@ -72,29 +64,18 @@ class DocumentController(
     }
 
     @GetMapping(produces = [MediaType.APPLICATION_JSON_VALUE])
-    override fun search(
-        @RequestParam documentType: String?,
-        @RequestParam source: String?,
-        @RequestParam businessReference: String?,
-        @RequestParam createdFrom: Instant?,
-        @RequestParam createdTo: Instant?,
-        @RequestParam page: Int?,
-        @RequestParam size: Int?,
-        @AuthenticationPrincipal jwt: Jwt,
-    ): DocumentPageResponse {
-        val caller = callerResolver.resolve(jwt)
-        val criteria = DocumentSearchCriteria(documentType?.let(::DocumentType), source, businessReference, createdFrom, createdTo)
-        val request = PageRequest(page ?: PageRequest.FIRST_PAGE, size ?: PageRequest.DEFAULT_SIZE)
-        return DocumentPageResponse.from(searchDocuments.search(DocumentSearchQuery(caller, criteria, request)))
+    override fun search(request: SearchDocumentsRequest, caller: AuthenticatedCaller): DocumentPageResponse {
+        val query = DocumentSearchQuery(caller, request.criteria(), request.pageRequest())
+        return DocumentPageResponse.from(searchDocuments.search(query))
     }
 
     @GetMapping("/{id}", produces = [MediaType.APPLICATION_JSON_VALUE])
-    override fun get(@PathVariable id: UUID, @AuthenticationPrincipal jwt: Jwt): ArchivedDocumentResponse =
-        ArchivedDocumentResponse.from(getDocument.get(DocumentQuery(callerResolver.resolve(jwt), DocumentId(id))))
+    override fun get(@PathVariable id: UUID, caller: AuthenticatedCaller): ArchivedDocumentResponse =
+        ArchivedDocumentResponse.from(getDocument.get(DocumentQuery(caller, DocumentId(id))))
 
     @GetMapping("/{id}/content")
-    override fun download(@PathVariable id: UUID, @AuthenticationPrincipal jwt: Jwt): ResponseEntity<Resource> {
-        val download = downloadDocument.download(DocumentQuery(callerResolver.resolve(jwt), DocumentId(id)))
+    override fun download(@PathVariable id: UUID, caller: AuthenticatedCaller): ResponseEntity<Resource> {
+        val download = downloadDocument.download(DocumentQuery(caller, DocumentId(id)))
         val file = download.document.file
         val disposition = ContentDisposition.attachment().filename(file.fileName, StandardCharsets.UTF_8).build()
         return ResponseEntity.ok()
@@ -105,8 +86,8 @@ class DocumentController(
     }
 
     @DeleteMapping("/{id}")
-    override fun delete(@PathVariable id: UUID, @AuthenticationPrincipal jwt: Jwt): ResponseEntity<Void> {
-        deleteDocument.delete(DocumentQuery(callerResolver.resolve(jwt), DocumentId(id)))
+    override fun delete(@PathVariable id: UUID, caller: AuthenticatedCaller): ResponseEntity<Void> {
+        deleteDocument.delete(DocumentQuery(caller, DocumentId(id)))
         return ResponseEntity.noContent().build()
     }
 }

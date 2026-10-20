@@ -12,13 +12,6 @@ import java.time.Instant
 interface DocumentRepository {
 
     /**
-     * Inserts [document], or replaces the stored state of the document with the same identifier.
-     *
-     * @throws DocumentPersistenceException when the store cannot be reached or refuses the document
-     */
-    fun save(document: ArchivedDocument)
-
-    /**
      * Inserts [document], which must be new: an existing document is never replaced.
      *
      * @throws DocumentPersistenceException when the store cannot be reached, or already holds a document with this identifier

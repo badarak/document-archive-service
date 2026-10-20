@@ -30,14 +30,6 @@ import org.springframework.data.domain.PageRequest as SpringPageRequest
 @Repository
 class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocumentRepository) : DocumentRepository {
 
-    override fun save(document: ArchivedDocument) {
-        try {
-            repository.save(document.toEntity())
-        } catch (e: DataAccessException) {
-            throw DocumentPersistenceException("Could not save document ${document.id}", e)
-        }
-    }
-
     override fun create(document: ArchivedDocument) {
         try {
             repository.insert(document.toEntity())

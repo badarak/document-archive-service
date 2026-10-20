@@ -48,7 +48,7 @@ class DocumentRepositoryAdapterIT {
     fun `a new document is stored with all its metadata`() {
         val document = pendingDocument()
 
-        adapter.save(document)
+        adapter.create(document)
 
         val stored = repository.findById(document.id.value).orElseThrow()
         assertEquals("acme", stored.tenantId)
@@ -65,32 +65,6 @@ class DocumentRepositoryAdapterIT {
         assertEquals(createdAt, stored.createdAt)
         assertEquals(createdAt, stored.updatedAt)
         assertNull(stored.deletedAt)
-    }
-
-    @Test
-    fun `saving a document again replaces its state`() {
-        val pending = pendingDocument()
-        adapter.save(pending)
-
-        adapter.save(pending.markAvailable(later))
-
-        val stored = repository.findById(pending.id.value).orElseThrow()
-        assertEquals(1, repository.count())
-        assertEquals("AVAILABLE", stored.status)
-        assertEquals(createdAt, stored.createdAt)
-        assertEquals(later, stored.updatedAt)
-    }
-
-    @Test
-    fun `a created document is stored with its initial state`() {
-        val document = pendingDocument()
-
-        adapter.create(document)
-
-        val stored = repository.findById(document.id.value).orElseThrow()
-        assertEquals("PENDING", stored.status)
-        assertEquals(document.file.objectKey.value, stored.objectKey)
-        assertEquals(createdAt, stored.updatedAt)
     }
 
     @Test
@@ -141,7 +115,7 @@ class DocumentRepositoryAdapterIT {
     @Test
     fun `a stored document is read back with all its fields for its tenant`() {
         val document = pendingDocument().markAvailable(later)
-        adapter.save(document)
+        adapter.create(document)
 
         val found = adapter.findByIdAndTenant(document.id, TenantId("acme"))!!
 
@@ -160,7 +134,7 @@ class DocumentRepositoryAdapterIT {
     @Test
     fun `a deleted document is stored and read back with its deletion date`() {
         val deleted = pendingDocument().markAvailable(later).markDeleting(later).markDeleted(deletedAt)
-        adapter.save(deleted)
+        adapter.create(deleted)
 
         val found = adapter.findByIdAndTenant(deleted.id, TenantId("acme"))!!
 
@@ -172,7 +146,7 @@ class DocumentRepositoryAdapterIT {
     @Test
     fun `a document of another tenant is not found`() {
         val document = pendingDocument()
-        adapter.save(document)
+        adapter.create(document)
 
         assertNull(adapter.findByIdAndTenant(document.id, TenantId("globex")))
     }
@@ -283,7 +257,7 @@ class DocumentRepositoryAdapterIT {
         status = status,
         createdAt = createdAt,
         updatedAt = createdAt,
-    ).also { adapter.save(it) }
+    ).also { adapter.create(it) }
 
     private fun pendingDocument(): ArchivedDocument = ArchivedDocument.create(
         id = DocumentId.generate(),

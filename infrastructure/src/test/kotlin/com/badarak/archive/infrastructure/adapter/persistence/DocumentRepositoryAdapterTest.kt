@@ -35,13 +35,25 @@ class DocumentRepositoryAdapterTest {
     @Test
     fun `a database failure becomes a document persistence error`() {
         val failure = DataAccessResourceFailureException("Connection refused")
-        every { repository.save(any()) } throws failure
+        every { repository.insert(any()) } throws failure
         val document = document()
 
-        val exception = assertThrows(DocumentPersistenceException::class.java) { adapter.save(document) }
+        val exception = assertThrows(DocumentPersistenceException::class.java) { adapter.create(document) }
 
         assertSame(failure, exception.cause)
-        assertEquals("Could not save document ${document.id}", exception.message)
+        assertEquals("Could not create document ${document.id}", exception.message)
+    }
+
+    @Test
+    fun `a database failure during a transition becomes a document persistence error`() {
+        val failure = DataAccessResourceFailureException("Connection refused")
+        every { repository.updateStatus(any(), any(), any(), any(), any()) } throws failure
+
+        val exception = assertThrows(DocumentPersistenceException::class.java) {
+            adapter.transition(document().markAvailable(Instant.parse("2026-10-14T09:16:00Z")), DocumentStatus.PENDING)
+        }
+
+        assertSame(failure, exception.cause)
     }
 
     @Test

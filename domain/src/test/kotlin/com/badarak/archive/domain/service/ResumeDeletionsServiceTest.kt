@@ -1,16 +1,9 @@
 package com.badarak.archive.domain.service
 
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
-import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentLifecycle
-import com.badarak.archive.domain.model.DocumentMetadata
-import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentStatus
-import com.badarak.archive.domain.model.DocumentType
-import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.StalledDocumentsPolicy
-import com.badarak.archive.domain.model.StoredFile
-import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
@@ -93,15 +86,5 @@ class ResumeDeletionsServiceTest {
         verify(exactly = 0) { storage.delete(third.file.objectKey) }
     }
 
-    private fun deleting(tenant: String) = ArchivedDocument(
-        id = DocumentId.generate(),
-        owner = DocumentOwner(TenantId(tenant), "billing-service"),
-        metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
-        file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        lifecycle = DocumentLifecycle(
-            status = DocumentStatus.DELETING,
-            createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-            updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
-        ),
-    )
+    private fun deleting(tenant: String) = aDocument(DocumentStatus.DELETING, tenant = tenant)
 }

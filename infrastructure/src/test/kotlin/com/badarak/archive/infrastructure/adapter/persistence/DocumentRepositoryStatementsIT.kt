@@ -1,14 +1,8 @@
 package com.badarak.archive.infrastructure.adapter.persistence
 
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
-import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentMetadata
-import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentStatus
-import com.badarak.archive.domain.model.DocumentType
-import com.badarak.archive.domain.model.ObjectKey
-import com.badarak.archive.domain.model.StoredFile
-import com.badarak.archive.domain.model.TenantId
 import jakarta.persistence.EntityManagerFactory
 import org.hibernate.SessionFactory
 import org.hibernate.stat.Statistics
@@ -71,11 +65,5 @@ class DocumentRepositoryStatementsIT {
         assertEquals(1, statistics.prepareStatementCount)
     }
 
-    private fun pendingDocument(): ArchivedDocument = ArchivedDocument.create(
-        id = DocumentId.generate(),
-        owner = DocumentOwner(TenantId("acme"), "billing-service"),
-        metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
-        file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        now = now,
-    )
+    private fun pendingDocument(): ArchivedDocument = aDocument(DocumentStatus.PENDING, at = now)
 }

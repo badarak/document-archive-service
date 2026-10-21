@@ -1,13 +1,8 @@
 package com.badarak.archive.domain.service
 
-import com.badarak.archive.domain.model.ArchivedDocument
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentLifecycle
-import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentNotFoundException
-import com.badarak.archive.domain.model.DocumentOwner
-import com.badarak.archive.domain.model.DocumentStatus
-import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
@@ -23,7 +18,6 @@ import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
-import java.time.Instant
 
 class DownloadDocumentServiceTest {
 
@@ -33,17 +27,7 @@ class DownloadDocumentServiceTest {
 
     private val query = DocumentQuery(AuthenticatedCaller(TenantId("acme"), "billing-service"), DocumentId.generate())
     private val key = ObjectKey("documents/7d7d57e1")
-    private val document = ArchivedDocument(
-        id = query.id,
-        owner = DocumentOwner(TenantId("acme"), "billing-service"),
-        metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
-        file = StoredFile("invoice.pdf", "application/pdf", 3, key),
-        lifecycle = DocumentLifecycle(
-            status = DocumentStatus.AVAILABLE,
-            createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-            updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
-        ),
-    )
+    private val document = aDocument(id = query.id, file = StoredFile("invoice.pdf", "application/pdf", 3, key))
 
     @Test
     fun `opens the stored content of a document the caller may read`() {

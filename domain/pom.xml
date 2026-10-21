@@ -12,4 +12,21 @@
 
     <artifactId>domain</artifactId>
     <name>domain</name>
+
+    <build>
+        <plugins>
+            <!-- Publishes the test fixtures, so the infrastructure tests build documents the same way. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

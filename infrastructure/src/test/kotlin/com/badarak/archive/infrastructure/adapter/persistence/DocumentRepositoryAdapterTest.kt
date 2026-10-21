@@ -1,16 +1,12 @@
 package com.badarak.archive.infrastructure.adapter.persistence
 
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentMetadata
-import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentStatus
-import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.InvalidDocumentTypeException
-import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.PageRequest
-import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import io.mockk.every
@@ -117,11 +113,5 @@ class DocumentRepositoryAdapterTest {
         updatedAt = Instant.parse("2026-10-14T09:15:00Z"),
     )
 
-    private fun document(): ArchivedDocument = ArchivedDocument.create(
-        id = DocumentId.generate(),
-        owner = DocumentOwner(TenantId("acme"), "billing-service"),
-        metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
-        file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        now = Instant.parse("2026-10-14T09:15:00Z"),
-    )
+    private fun document(): ArchivedDocument = aDocument(DocumentStatus.PENDING, at = Instant.parse("2026-10-14T09:15:00Z"))
 }

@@ -1,16 +1,9 @@
 package com.badarak.archive.domain.service
 
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
-import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentLifecycle
-import com.badarak.archive.domain.model.DocumentMetadata
-import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentStatus
-import com.badarak.archive.domain.model.DocumentType
-import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.StalledDocumentsPolicy
-import com.badarak.archive.domain.model.StoredFile
-import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
@@ -118,11 +111,5 @@ class AbandonStalledArchivingsServiceTest {
         verify(exactly = 2) { storage.delete(stalled.file.objectKey) }
     }
 
-    private fun pending(tenant: String) = ArchivedDocument(
-        id = DocumentId.generate(),
-        owner = DocumentOwner(TenantId(tenant), "billing-service"),
-        metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
-        file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        lifecycle = DocumentLifecycle(DocumentStatus.PENDING, Instant.parse("2026-10-15T09:15:00Z"), Instant.parse("2026-10-15T09:15:00Z")),
-    )
+    private fun pending(tenant: String) = aDocument(DocumentStatus.PENDING, tenant = tenant)
 }

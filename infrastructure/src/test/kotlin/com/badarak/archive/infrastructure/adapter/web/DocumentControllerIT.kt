@@ -1,15 +1,14 @@
 package com.badarak.archive.infrastructure.adapter.web
 
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.ArchivingAbandonedException
 import com.badarak.archive.domain.model.ContentMismatchException
 import com.badarak.archive.domain.model.ContentTypeMismatchException
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentNotFoundException
-import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentPage
 import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentStatus
@@ -312,16 +311,9 @@ class DocumentControllerIT {
             }
         }
 
-        private fun stored(fileName: String) = ArchivedDocument(
+        private fun stored(fileName: String) = aDocument(
             id = DocumentId.parse(ID),
-            owner = DocumentOwner(TenantId("acme"), "billing-service"),
-            metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
             file = StoredFile(fileName, "application/pdf", content.size.toLong(), ObjectKey.generate()),
-            lifecycle = DocumentLifecycle(
-                status = DocumentStatus.AVAILABLE,
-                createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-                updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
-            ),
         )
 
         private fun readToken() = TestAuthorizationServer.token(scope = "documents:read")
@@ -629,13 +621,11 @@ class DocumentControllerIT {
 
     private fun token() = TestAuthorizationServer.token(scope = "documents:write")
 
-    private fun archived(metadata: DocumentMetadata): ArchivedDocument = ArchivedDocument.create(
+    private fun archived(metadata: DocumentMetadata): ArchivedDocument = aDocument(
         id = DocumentId.parse(ID),
-        owner = DocumentOwner(TenantId("acme"), "billing-service"),
         metadata = metadata,
         file = StoredFile("invoice-123.pdf", "application/pdf", content.size.toLong(), ObjectKey.generate()),
-        now = Instant.parse("2026-10-15T09:15:00Z"),
-    ).markAvailable(Instant.parse("2026-10-15T09:15:00Z"))
+    )
 
     @TestConfiguration
     class UseCaseStub {

@@ -1,13 +1,10 @@
 package com.badarak.archive.domain.service
 
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentLifecycle
-import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentNotFoundException
-import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentStatus
-import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
@@ -142,16 +139,5 @@ class DeleteDocumentServiceTest {
         verify(exactly = 0) { storage.delete(any()) }
     }
 
-    private fun document(status: DocumentStatus) = ArchivedDocument(
-        id = id,
-        owner = DocumentOwner(TenantId("acme"), "billing-service"),
-        metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
-        file = StoredFile("invoice.pdf", "application/pdf", 1, key),
-        lifecycle = DocumentLifecycle(
-            status = status,
-            createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-            updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
-            deletedAt = Instant.parse("2026-10-15T09:15:00Z").takeIf { status == DocumentStatus.DELETED },
-        ),
-    )
+    private fun document(status: DocumentStatus) = aDocument(status, id = id, file = StoredFile("invoice.pdf", "application/pdf", 1, key))
 }

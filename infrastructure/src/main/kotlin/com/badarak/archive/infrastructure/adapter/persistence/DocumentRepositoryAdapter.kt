@@ -15,12 +15,15 @@ import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
+import jakarta.persistence.criteria.Path
+import jakarta.persistence.criteria.Root
 import org.springframework.dao.DataAccessException
 import org.springframework.data.domain.Limit
 import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Repository
 import java.time.Instant
+import kotlin.reflect.KProperty1
 import org.springframework.data.domain.PageRequest as SpringPageRequest
 
 /**
@@ -66,22 +69,24 @@ class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocume
     }
 }
 
-private val NEWEST_FIRST = Sort.by(Sort.Direction.DESC, "createdAt", "id")
+private val NEWEST_FIRST = Sort.by(Sort.Direction.DESC, ArchivedDocumentEntity::createdAt.name, ArchivedDocumentEntity.ID)
 
 private fun matching(tenantId: TenantId, status: DocumentStatus, criteria: DocumentSearchCriteria) =
     Specification<ArchivedDocumentEntity> { root, _, builder ->
         builder.and(
             *listOfNotNull(
-                builder.equal(root.get<String>("tenantId"), tenantId.value),
-                builder.equal(root.get<String>("status"), status.name),
-                criteria.documentType?.let { builder.equal(root.get<String>("documentType"), it.value) },
-                criteria.source?.let { builder.equal(root.get<String>("source"), it) },
-                criteria.businessReference?.let { builder.equal(root.get<String>("businessReference"), it) },
-                criteria.createdFrom?.let { builder.greaterThanOrEqualTo(root.get<Instant>("createdAt"), it) },
-                criteria.createdTo?.let { builder.lessThanOrEqualTo(root.get<Instant>("createdAt"), it) },
+                builder.equal(root.get(ArchivedDocumentEntity::tenantId), tenantId.value),
+                builder.equal(root.get(ArchivedDocumentEntity::status), status.name),
+                criteria.documentType?.let { builder.equal(root.get(ArchivedDocumentEntity::documentType), it.value) },
+                criteria.source?.let { builder.equal(root.get(ArchivedDocumentEntity::source), it) },
+                criteria.businessReference?.let { builder.equal(root.get(ArchivedDocumentEntity::businessReference), it) },
+                criteria.createdFrom?.let { builder.greaterThanOrEqualTo(root.get(ArchivedDocumentEntity::createdAt), it) },
+                criteria.createdTo?.let { builder.lessThanOrEqualTo(root.get(ArchivedDocumentEntity::createdAt), it) },
             ).toTypedArray(),
         )
     }
+
+private fun <T> Root<ArchivedDocumentEntity>.get(property: KProperty1<ArchivedDocumentEntity, T>): Path<T> = get(property.name)
 
 private fun ArchivedDocument.toEntity(): ArchivedDocumentEntity = ArchivedDocumentEntity(
     id = id.value,

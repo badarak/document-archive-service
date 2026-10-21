@@ -126,4 +126,8 @@ interface DocumentApi {
         @Parameter(hidden = true)
         caller: AuthenticatedCaller,
     ): ResponseEntity<Void>
+
+    companion object {
+        const val PATH = "/api/v1/documents"
+    }
 }

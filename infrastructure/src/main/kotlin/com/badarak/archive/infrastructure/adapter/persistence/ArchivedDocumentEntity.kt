@@ -67,4 +67,8 @@ class ArchivedDocumentEntity(
     fun markPersisted() {
         persisted = true
     }
+
+    companion object {
+        const val ID = "id"
+    }
 }

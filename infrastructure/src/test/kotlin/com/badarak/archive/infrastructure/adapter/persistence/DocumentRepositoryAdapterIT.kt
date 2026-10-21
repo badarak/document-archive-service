@@ -1,10 +1,9 @@
 package com.badarak.archive.infrastructure.adapter.persistence
 
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
-import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
@@ -249,19 +248,19 @@ class DocumentRepositoryAdapterIT {
         source: String = "billing-service",
         reference: String = "INV-1",
         createdAt: Instant = this.createdAt,
-    ): ArchivedDocument = ArchivedDocument(
-        id = DocumentId.generate(),
-        owner = DocumentOwner(TenantId(tenant), source),
+    ): ArchivedDocument = aDocument(
+        status = status,
+        tenant = tenant,
+        source = source,
         metadata = DocumentMetadata(DocumentType(type), reference, null, emptyMap()),
-        file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        lifecycle = DocumentLifecycle(status, createdAt, createdAt),
+        at = createdAt,
     ).also { adapter.create(it) }
 
-    private fun pendingDocument(): ArchivedDocument = ArchivedDocument.create(
-        id = DocumentId.generate(),
-        owner = DocumentOwner(TenantId("acme"), "BILLING-SERVICE"),
+    private fun pendingDocument(): ArchivedDocument = aDocument(
+        status = DocumentStatus.PENDING,
+        source = "BILLING-SERVICE",
         metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
         file = StoredFile("invoice-123.pdf", "application/pdf", 248_120, ObjectKey.generate()),
-        now = createdAt,
+        at = createdAt,
     )
 }

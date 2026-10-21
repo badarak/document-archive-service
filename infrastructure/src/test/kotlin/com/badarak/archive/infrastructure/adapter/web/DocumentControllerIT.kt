@@ -1,15 +1,14 @@
 package com.badarak.archive.infrastructure.adapter.web
 
+import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.ArchivingAbandonedException
 import com.badarak.archive.domain.model.ContentMismatchException
 import com.badarak.archive.domain.model.ContentTypeMismatchException
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentId
-import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentNotFoundException
-import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentPage
 import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentStatus
@@ -73,6 +72,7 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
 import java.io.ByteArrayInputStream
 import java.time.Instant
+import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -212,13 +212,13 @@ class DocumentControllerIT {
                 jsonPath("$.tenantId") { doesNotExist() }
             }
 
-            assertEquals(DocumentId.parse(ID), query.captured.id)
+            assertEquals(DOCUMENT_ID, query.captured.id)
             assertEquals(TenantId("acme"), query.captured.caller.tenantId)
         }
 
         @Test
         fun `a document that is not found is answered with 404`() {
-            every { getDocument.get(any()) } throws DocumentNotFoundException(DocumentId.parse(ID))
+            every { getDocument.get(any()) } throws DocumentNotFoundException(DOCUMENT_ID)
 
             mockMvc.get("$DOCUMENTS/$ID") { header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}") }.andExpect {
                 status { isNotFound() }
@@ -273,13 +273,13 @@ class DocumentControllerIT {
 
             assertArrayEquals(content, response.response.contentAsByteArray)
             assertTrue(stream.closed)
-            assertEquals(DocumentId.parse(ID), query.captured.id)
+            assertEquals(DOCUMENT_ID, query.captured.id)
             assertEquals(TenantId("acme"), query.captured.caller.tenantId)
         }
 
         @Test
         fun `a document that is not found is answered with 404, whatever the accepted type`() {
-            every { downloadDocument.download(any()) } throws DocumentNotFoundException(DocumentId.parse(ID))
+            every { downloadDocument.download(any()) } throws DocumentNotFoundException(DOCUMENT_ID)
 
             mockMvc.get("$DOCUMENTS/$ID/content") {
                 header(HttpHeaders.AUTHORIZATION, "Bearer ${readToken()}")
@@ -312,16 +312,9 @@ class DocumentControllerIT {
             }
         }
 
-        private fun stored(fileName: String) = ArchivedDocument(
-            id = DocumentId.parse(ID),
-            owner = DocumentOwner(TenantId("acme"), "billing-service"),
-            metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
+        private fun stored(fileName: String) = aDocument(
+            id = DOCUMENT_ID,
             file = StoredFile(fileName, "application/pdf", content.size.toLong(), ObjectKey.generate()),
-            lifecycle = DocumentLifecycle(
-                status = DocumentStatus.AVAILABLE,
-                createdAt = Instant.parse("2026-10-15T09:15:00Z"),
-                updatedAt = Instant.parse("2026-10-15T09:15:00Z"),
-            ),
         )
 
         private fun readToken() = TestAuthorizationServer.token(scope = "documents:read")
@@ -482,13 +475,13 @@ class DocumentControllerIT {
                 content { string("") }
             }
 
-            assertEquals(DocumentId.parse(ID), query.captured.id)
+            assertEquals(DOCUMENT_ID, query.captured.id)
             assertEquals(TenantId("acme"), query.captured.caller.tenantId)
         }
 
         @Test
         fun `a document that is not found is answered with 404`() {
-            every { deleteDocument.delete(any()) } throws DocumentNotFoundException(DocumentId.parse(ID))
+            every { deleteDocument.delete(any()) } throws DocumentNotFoundException(DOCUMENT_ID)
 
             delete().andExpect {
                 status { isNotFound() }
@@ -629,13 +622,11 @@ class DocumentControllerIT {
 
     private fun token() = TestAuthorizationServer.token(scope = "documents:write")
 
-    private fun archived(metadata: DocumentMetadata): ArchivedDocument = ArchivedDocument.create(
-        id = DocumentId.parse(ID),
-        owner = DocumentOwner(TenantId("acme"), "billing-service"),
+    private fun archived(metadata: DocumentMetadata): ArchivedDocument = aDocument(
+        id = DOCUMENT_ID,
         metadata = metadata,
         file = StoredFile("invoice-123.pdf", "application/pdf", content.size.toLong(), ObjectKey.generate()),
-        now = Instant.parse("2026-10-15T09:15:00Z"),
-    ).markAvailable(Instant.parse("2026-10-15T09:15:00Z"))
+    )
 
     @TestConfiguration
     class UseCaseStub {
@@ -665,6 +656,7 @@ class DocumentControllerIT {
         private const val DOCUMENTS = "/api/v1/documents"
         private const val DISPOSITION = "attachment; filename=\"facture-e.pdf\"; filename*=UTF-8''facture-%C3%A9.pdf"
         private const val ID = "7d7d57e1-4c50-4cb9-98b8-c5b60e8a2f01"
+        private val DOCUMENT_ID = DocumentId(UUID.fromString(ID))
         private const val METADATA = """
             {"documentType": "INVOICE", "businessReference": "INV-2026-000123",
              "description": "Customer invoice", "tags": {"customerId": "CUST-456"}}

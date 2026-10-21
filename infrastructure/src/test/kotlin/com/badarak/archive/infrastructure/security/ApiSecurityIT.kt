@@ -41,6 +41,8 @@ class ApiSecurityIT {
             header { string(HttpHeaders.WWW_AUTHENTICATE, startsWith("Bearer")) }
             content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
             jsonPath("$.status") { value(401) }
+            jsonPath("$.title") { value("Unauthorized") }
+            jsonPath("$.detail") { value("A valid bearer token is required") }
             jsonPath("$.code") { value("unauthenticated") }
             jsonPath("$.instance") { value(DOCUMENTS) }
         }

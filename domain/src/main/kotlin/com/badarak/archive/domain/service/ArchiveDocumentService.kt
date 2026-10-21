@@ -42,27 +42,44 @@ class ArchiveDocumentService(
     private val failure = ArchivingFailure(documents, storage, clock)
 
     override fun archive(command: ArchiveDocumentCommand): ArchivedDocument {
+        val content = command.file.content.buffered()
+        val pending = admit(command, content)
+        documents.create(pending)
+        upload(pending, content)
+        return complete(pending)
+    }
+
+    private fun admit(command: ArchiveDocumentCommand, content: InputStream): ArchivedDocument {
         val file = command.file
-        val stream = file.content.buffered()
         val fileName = FileName.of(file.fileName)
         sizePolicy.check(file.sizeBytes)
-        formatPolicy.check(fileName, file.contentType, readHeader(stream))
-        val pending = ArchivedDocument.create(
+        val mediaType = formatPolicy.check(fileName, file.contentType, readHeader(content))
+        return ArchivedDocument.create(
             id = DocumentId.generate(),
             owner = DocumentOwner(command.caller.tenantId, command.caller.source),
             metadata = command.metadata,
-            file = StoredFile(fileName.value, formatPolicy.mediaType(file.contentType), file.sizeBytes, ObjectKey.generate()),
-            sizePolicy = sizePolicy,
+            file = StoredFile(fileName.value, mediaType, file.sizeBytes, ObjectKey.generate()),
             now = clock.instant(),
         )
+    }
 
-        documents.create(pending)
+    private fun readHeader(content: InputStream): ByteArray {
+        content.mark(DocumentFormat.HEADER_LENGTH)
+        val header = content.readNBytes(DocumentFormat.HEADER_LENGTH)
+        content.reset()
+        return header
+    }
+
+    private fun upload(pending: ArchivedDocument, content: InputStream) {
         try {
-            storage.store(pending.file.objectKey, stream, pending.file.sizeBytes, pending.file.contentType)
+            storage.store(pending.file.objectKey, content, pending.file.sizeBytes, pending.file.contentType)
         } catch (e: ObjectStorageException) {
             recordFailure(pending, e)
             throw e
         }
+    }
+
+    private fun complete(pending: ArchivedDocument): ArchivedDocument {
         val available = pending.markAvailable(clock.instant())
         val recorded = try {
             documents.transition(available, DocumentStatus.PENDING)
@@ -74,23 +91,6 @@ class ArchiveDocumentService(
         return available
     }
 
-    private fun abandoned(pending: ArchivedDocument): ArchivingAbandonedException {
-        val error = ArchivingAbandonedException(pending.id)
-        try {
-            storage.delete(pending.file.objectKey)
-        } catch (e: ObjectStorageException) {
-            error.addSuppressed(e)
-        }
-        return error
-    }
-
-    private fun readHeader(stream: InputStream): ByteArray {
-        stream.mark(DocumentFormat.HEADER_LENGTH)
-        val header = stream.readNBytes(DocumentFormat.HEADER_LENGTH)
-        stream.reset()
-        return header
-    }
-
     private fun recordFailure(pending: ArchivedDocument, cause: Exception) {
         try {
             failure.record(pending)
@@ -99,5 +99,15 @@ class ArchiveDocumentService(
         } catch (e: DocumentPersistenceException) {
             cause.addSuppressed(e)
         }
+    }
+
+    private fun abandoned(pending: ArchivedDocument): ArchivingAbandonedException {
+        val error = ArchivingAbandonedException(pending.id)
+        try {
+            storage.delete(pending.file.objectKey)
+        } catch (e: ObjectStorageException) {
+            error.addSuppressed(e)
+        }
+        return error
     }
 }

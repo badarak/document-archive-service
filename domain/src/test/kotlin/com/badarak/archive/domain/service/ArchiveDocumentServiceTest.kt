@@ -6,6 +6,7 @@ import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
+import com.badarak.archive.domain.model.DocumentTooLargeException
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.EmptyDocumentException
 import com.badarak.archive.domain.model.ObjectKey
@@ -109,6 +110,13 @@ class ArchiveDocumentServiceTest {
         @Test
         fun `an unsupported format leaves no trace`() {
             assertThrows(UnsupportedDocumentFormatException::class.java) { service.archive(command(fileName = "setup.exe")) }
+
+            assertNothingWritten()
+        }
+
+        @Test
+        fun `a document above the size limit leaves no trace`() {
+            assertThrows(DocumentTooLargeException::class.java) { service.archive(command(content = ByteArray(1_001))) }
 
             assertNothingWritten()
         }

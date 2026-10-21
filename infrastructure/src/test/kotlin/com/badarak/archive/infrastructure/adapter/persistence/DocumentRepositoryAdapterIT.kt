@@ -6,7 +6,6 @@ import com.badarak.archive.domain.model.DocumentLifecycle
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSearchCriteria
-import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
@@ -263,7 +262,6 @@ class DocumentRepositoryAdapterIT {
         owner = DocumentOwner(TenantId("acme"), "BILLING-SERVICE"),
         metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
         file = StoredFile("invoice-123.pdf", "application/pdf", 248_120, ObjectKey.generate()),
-        sizePolicy = DocumentSizePolicy(),
         now = createdAt,
     )
 }

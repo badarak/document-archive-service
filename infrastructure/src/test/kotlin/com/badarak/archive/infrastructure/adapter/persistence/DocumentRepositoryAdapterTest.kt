@@ -5,7 +5,6 @@ import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSearchCriteria
-import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.InvalidDocumentTypeException
@@ -123,7 +122,6 @@ class DocumentRepositoryAdapterTest {
         owner = DocumentOwner(TenantId("acme"), "billing-service"),
         metadata = DocumentMetadata(DocumentType("INVOICE"), null, null, emptyMap()),
         file = StoredFile("invoice.pdf", "application/pdf", 1, ObjectKey.generate()),
-        sizePolicy = DocumentSizePolicy(),
         now = Instant.parse("2026-10-14T09:15:00Z"),
     )
 }

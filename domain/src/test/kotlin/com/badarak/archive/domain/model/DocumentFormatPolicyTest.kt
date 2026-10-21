@@ -16,14 +16,14 @@ class DocumentFormatPolicyTest {
     }
 
     @Test
-    fun `returns the format of a conforming document`() {
-        assertEquals(DocumentFormat.PDF, policy.check(FileName.of("invoice.pdf"), "application/pdf", PDF_HEADER))
+    fun `returns the media type of a conforming document`() {
+        assertEquals("application/pdf", policy.check(FileName.of("invoice.pdf"), "application/pdf", PDF_HEADER))
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["application/pdf; charset=binary", "Application/PDF", " application/pdf "])
-    fun `ignores the case and the parameters of the declared content type`(contentType: String) {
-        assertEquals(DocumentFormat.PDF, policy.check(FileName.of("invoice.pdf"), contentType, PDF_HEADER))
+    @ValueSource(strings = ["application/pdf; charset=binary", "Application/PDF", " application/pdf ", " application/pdf ; charset=binary"])
+    fun `reduces the declared content type to its media type, whatever its case and parameters`(contentType: String) {
+        assertEquals("application/pdf", policy.check(FileName.of("invoice.pdf"), contentType, PDF_HEADER))
     }
 
     @ParameterizedTest
@@ -69,13 +69,7 @@ class DocumentFormatPolicyTest {
 
     @Test
     fun `accepts an e-mail whatever its content`() {
-        assertEquals(DocumentFormat.EML, policy.check(FileName.of("message.eml"), "message/rfc822", "From: a@b.c".toByteArray()))
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["application/pdf", "Application/PDF", " application/pdf ; charset=binary"])
-    fun `normalises a content type to its media type`(contentType: String) {
-        assertEquals("application/pdf", policy.mediaType(contentType))
+        assertEquals("message/rfc822", policy.check(FileName.of("message.eml"), "message/rfc822", "From: a@b.c".toByteArray()))
     }
 
     @Test

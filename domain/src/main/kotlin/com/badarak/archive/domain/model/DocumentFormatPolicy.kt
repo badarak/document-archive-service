@@ -14,15 +14,22 @@ class DocumentFormatPolicy(allowedFormats: Set<DocumentFormat> = DocumentFormat.
         require(this.allowedFormats.isNotEmpty()) { "At least one document format must be allowed" }
     }
 
-    fun check(fileName: FileName, declaredContentType: String, contentHeader: ByteArray): DocumentFormat {
+    /**
+     * Checks a document against the rule and returns its declared content type reduced to its media type, as it is stored:
+     * without parameters, surrounding spaces nor upper case.
+     *
+     * @throws UnsupportedDocumentFormatException when the extension names no allowed format
+     * @throws ContentTypeMismatchException when the declared content type does not match the format
+     * @throws ContentMismatchException when the content does not match the format
+     */
+    fun check(fileName: FileName, declaredContentType: String, contentHeader: ByteArray): String {
         val format = DocumentFormat.ofExtension(fileName.extension)?.takeIf { it in allowedFormats }
             ?: throw UnsupportedDocumentFormatException(fileName.value, allowedFormats.map { it.extension })
-        if (mediaType(declaredContentType) !in format.contentTypes) throw ContentTypeMismatchException(declaredContentType, format)
+        val mediaType = declaredContentType.substringBefore(';').trim().lowercase()
+        if (mediaType !in format.contentTypes) throw ContentTypeMismatchException(declaredContentType, format)
         if (!format.matchesContent(contentHeader)) throw ContentMismatchException(format)
-        return format
+        return mediaType
     }
-
-    fun mediaType(contentType: String): String = contentType.substringBefore(';').trim().lowercase()
 
     companion object {
         fun ofExtensions(extensions: Collection<String>): DocumentFormatPolicy = DocumentFormatPolicy(

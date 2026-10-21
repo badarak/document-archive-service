@@ -1,5 +1,6 @@
 package com.badarak.archive.infrastructure.security
 
+import com.badarak.archive.infrastructure.adapter.web.DocumentApi
 import jakarta.servlet.DispatcherType
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -45,7 +46,7 @@ class SecurityConfiguration {
     }
 
     companion object {
-        private const val DOCUMENT_COLLECTION = "/api/v1/documents"
+        private const val DOCUMENT_COLLECTION = DocumentApi.PATH
         private const val DOCUMENT = "$DOCUMENT_COLLECTION/*"
         private const val DOCUMENTS = "$DOCUMENT_COLLECTION/**"
         private const val READ_DOCUMENTS = "SCOPE_documents:read"

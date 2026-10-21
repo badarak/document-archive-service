@@ -34,7 +34,7 @@ import java.util.UUID
 @Tag(name = "Documents", description = "Archiving of documents sent by other services")
 @SecurityRequirement(name = OpenApiConfiguration.BEARER_JWT)
 @RestController
-@RequestMapping("/api/v1/documents")
+@RequestMapping(DocumentApi.PATH)
 class DocumentController(
     private val archiveDocument: ArchiveDocumentUseCase,
     private val getDocument: GetDocumentUseCase,

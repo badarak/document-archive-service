@@ -28,6 +28,21 @@ services:
     volumes:
       - miniodata:/data
 
+  # Local authorization server: issues the access tokens of two calling services, one per tenant. The realm is
+  # imported at each start from docker/keycloak; nothing is persisted, so changes made in the console are lost.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.5
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${ARCHIVE_KEYCLOAK_ADMIN_USERNAME:?set it in .env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${ARCHIVE_KEYCLOAK_ADMIN_PASSWORD:?set it in .env}
+      ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET: ${ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET:?set it in .env}
+      ARCHIVE_KEYCLOAK_GLOBEX_CLIENT_SECRET: ${ARCHIVE_KEYCLOAK_GLOBEX_CLIENT_SECRET:?set it in .env}
+    ports:
+      - "${ARCHIVE_KEYCLOAK_PORT:?set it in .env}:8080"
+    volumes:
+      - ./docker/keycloak:/opt/keycloak/data/import:ro
+
 volumes:
   pgdata:
   miniodata:

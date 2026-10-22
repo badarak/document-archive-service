@@ -8,6 +8,7 @@ in PostgreSQL; the binary content goes to an S3-compatible object storage (MinIO
 - JDK 21
 - Maven 3.9 or later
 - Docker with Docker Compose v2
+- `jq`, to read the access token in the local examples
 
 ## Local startup
 
@@ -19,11 +20,15 @@ Run every command from the project root.
 cp .env.example .env
 ```
 
-Then fill in the four empty values in `.env`: the database username and password, and the object
-storage access key and secret key (at least 8 characters). Any value works locally; the same file
-configures both the containers and the application. `.env` is ignored by git.
+Then fill in the eight empty values in `.env`: the database username and password, the object
+storage access key and secret key (at least 8 characters), the Keycloak admin username and password,
+and the secrets of the two calling services. Any value works locally; the same file configures both
+the containers and the application. `.env` is ignored by git.
 
-### 2. Start PostgreSQL and MinIO
+An existing `.env` must also get the `ARCHIVE_KEYCLOAK_*` variables of `.env.example`: Docker Compose
+checks the variables of every service, so without them it starts none of the containers.
+
+### 2. Start PostgreSQL, MinIO and Keycloak
 
 ```bash
 docker compose up -d
@@ -32,6 +37,9 @@ docker compose up -d
 - PostgreSQL listens on port 5432. On its first start, an init script creates the `archive` schema.
 - MinIO serves the S3 API on port 9000 and a web console on <http://localhost:9001>. Sign in to the
   console with the access key and secret key from `.env`.
+- Keycloak, the local authorization server, listens on port 8180, with its admin console on
+  <http://localhost:8180>. It imports the `archive` realm from `docker/keycloak` at each start and
+  keeps nothing: changes made in the console are lost on restart.
 
 ### 3. Create the bucket
 
@@ -66,6 +74,8 @@ one is missing.
 | `ARCHIVE_DB_USERNAME`, `ARCHIVE_DB_PASSWORD` | Database credentials, shared by the container and the application |
 | `ARCHIVE_DB_URL` | JDBC URL used by the application; keep it consistent with the name and port above |
 | `ARCHIVE_S3_PORT`, `ARCHIVE_S3_CONSOLE_PORT` | Published ports of the MinIO container |
+| `ARCHIVE_KEYCLOAK_PORT`, `ARCHIVE_KEYCLOAK_ADMIN_USERNAME`, `ARCHIVE_KEYCLOAK_ADMIN_PASSWORD` | Published port and admin account of the Keycloak container |
+| `ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET`, `ARCHIVE_KEYCLOAK_GLOBEX_CLIENT_SECRET` | Secrets of the two calling services declared in the local realm |
 | `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
@@ -155,10 +165,32 @@ Each archived document records the tenant and the source of its caller, read fro
 `tenant_id` for the tenant and `azp` (the OAuth2 client the token was issued to) for the source. The
 authorization server must add the tenant claim, which is not standard.
 
-**No authorization server runs locally yet.** The `ARCHIVE_JWT_*` values in `.env.example` are
-placeholders: they let the application start, but no token can be obtained, so the document API
-always answers `401`. Token validation is covered by the integration tests, which sign their own
-tokens.
+### Getting a token locally
+
+The local Keycloak declares two calling services, each with its own tenant, which get tokens with the
+OAuth2 client credentials grant:
+
+| Client | `tenant_id` | Secret |
+|---|---|---|
+| `billing-service` | `acme` | `ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET` |
+| `globex-billing-service` | `globex` | `ARCHIVE_KEYCLOAK_GLOBEX_CLIENT_SECRET` |
+
+A token carries the scopes it asks for, among `documents:read`, `documents:write` and
+`documents:delete`, and is valid for 15 minutes:
+
+```bash
+source .env
+TOKEN=$(curl -s http://localhost:8180/realms/archive/protocol/openid-connect/token \
+  -d grant_type=client_credentials -d client_id=billing-service \
+  -d client_secret="$ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET" \
+  --data-urlencode "scope=documents:read documents:write documents:delete" | jq -r .access_token)
+
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/documents?documentType=INVOICE"
+```
+
+The same token can be pasted in the Swagger UI, under *Authorize*. A token of `globex-billing-service`
+never sees the documents of `acme`, and a token without the required scope gets `403`. Token
+validation is also covered by the integration tests, which sign their own tokens.
 
 ## Tests
 

@@ -63,6 +63,18 @@ archive:
 
 # The OpenAPI description and the Swagger UI are public, so they are off unless explicitly enabled.
 springdoc:
+  # Security schemes of the OpenAPI description, with the field names of the specification. springdoc only takes them
+  # from here while the code declares none. A profile that adds a scheme must also repeat the whole security list,
+  # since a list is replaced, not merged.
+  open-api:
+    components:
+      securitySchemes:
+        bearer-jwt:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
+    security:
+      - bearer-jwt: []
   api-docs:
     enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
   swagger-ui:

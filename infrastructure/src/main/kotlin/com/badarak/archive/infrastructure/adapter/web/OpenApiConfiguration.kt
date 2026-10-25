@@ -1,7 +1,6 @@
 package com.badarak.archive.infrastructure.adapter.web
 
 import io.swagger.v3.core.converter.ModelConverters
-import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.info.Info
@@ -10,7 +9,6 @@ import io.swagger.v3.oas.models.media.MediaType
 import io.swagger.v3.oas.models.media.Schema
 import io.swagger.v3.oas.models.responses.ApiResponse
 import io.swagger.v3.oas.models.responses.ApiResponses
-import io.swagger.v3.oas.models.security.SecurityScheme
 import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -20,6 +18,10 @@ import org.springframework.http.MediaType as SpringMediaType
 @Configuration
 class OpenApiConfiguration {
 
+    /**
+     * Presents the API. Its security schemes are declared in the configuration (springdoc.open-api), which differs per
+     * profile: springdoc only takes them from there while this description declares none.
+     */
     @Bean
     fun openApi(): OpenAPI = OpenAPI()
         .info(
@@ -27,12 +29,6 @@ class OpenApiConfiguration {
                 .title("Document Archive Service")
                 .version("v1")
                 .description("Archives documents for other services: content in S3-compatible storage, metadata in PostgreSQL."),
-        )
-        .components(
-            Components().addSecuritySchemes(
-                BEARER_JWT,
-                SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT"),
-            ),
         )
 
     /**
@@ -58,8 +54,4 @@ class OpenApiConfiguration {
 
     private fun problem(): Content =
         Content().addMediaType(SpringMediaType.APPLICATION_PROBLEM_JSON_VALUE, MediaType().schema(Schema<Any>().`$ref`("ProblemDetail")))
-
-    companion object {
-        const val BEARER_JWT = "bearer-jwt"
-    }
 }

@@ -213,3 +213,11 @@ Nothing is tested automatically against a real PostgreSQL or MinIO.
   local data and the bucket.
 - **The container name `miniostorage` is already in use**: the name is fixed, so two copies of the
   project cannot run on the same machine at the same time.
+
+## AI assistance
+
+This repository is developed with the help of Claude (Anthropic), through Claude Code: code, tests,
+reviews and the analyses in `docs/`. The assistant follows the rules in `CLAUDE.md`, and every change
+is reviewed, tested and merged by the maintainer, who remains responsible for it. Assisted commits
+carry a `Co-Authored-By: Claude` trailer (`git log --grep "Co-Authored-By: Claude"` lists them), and
+assisted pull requests say so at the end of their description.

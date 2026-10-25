@@ -76,6 +76,17 @@ class DocumentRepositoryAdapterTest {
     }
 
     @Test
+    fun `a stalled row that breaks a domain rule is left out, without holding back the others`() {
+        val invalid = entity(documentType = "invoice", status = "PENDING")
+        val valid = entity(status = "PENDING")
+        every { repository.findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc("PENDING", any(), any()) } returns listOf(invalid, valid)
+
+        val stalled = adapter.findStalled(DocumentStatus.PENDING, Instant.parse("2026-10-14T09:30:00Z"), 10)
+
+        assertEquals(listOf(DocumentId(valid.getId())), stalled.map { it.id })
+    }
+
+    @Test
     fun `a stored row that breaks a domain rule becomes a document persistence error`() {
         val row = entity(documentType = "invoice")
         every { repository.findByIdAndTenantId(row.getId(), "acme") } returns row

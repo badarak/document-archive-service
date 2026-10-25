@@ -46,7 +46,8 @@ interface DocumentRepository {
     /**
      * Returns at most [limit] documents in [status] last updated before [updatedBefore], oldest update first, whatever
      * their tenant. Reserved to internal maintenance tasks: a request made on behalf of a caller goes through
-     * [findByIdAndTenant] or [search], which never cross tenants.
+     * [findByIdAndTenant] or [search], which never cross tenants. A stored document that can no longer be rebuilt, since it
+     * breaks a current domain rule, is left out, so that it never holds back the others; it still counts in [limit].
      *
      * @throws DocumentPersistenceException when the store cannot be reached
      */

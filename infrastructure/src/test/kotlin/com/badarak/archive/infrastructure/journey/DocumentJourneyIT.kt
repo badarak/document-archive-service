@@ -2,14 +2,12 @@ package com.badarak.archive.infrastructure.journey
 
 import com.badarak.archive.domain.port.inbound.AbandonStalledArchivingsUseCase
 import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
-import com.badarak.archive.domain.port.outbound.ObjectStorageException
 import com.badarak.archive.infrastructure.adapter.persistence.SpringDataArchivedDocumentRepository
 import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import com.jayway.jsonpath.JsonPath
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -273,11 +271,11 @@ class DocumentJourneyIT {
             storage.unavailable = false
 
             clock.set(START.plus(Duration.ofMinutes(10)))
-            assertEquals(0, resumeDeletions.resume())
+            assertTrue(resumeDeletions.resume().completed.isEmpty())
             assertEquals("DELETING", row(acmeDocument).status)
 
             clock.set(START.plus(Duration.ofMinutes(16)))
-            assertEquals(2, resumeDeletions.resume())
+            assertEquals(2, resumeDeletions.resume().completed.size)
 
             assertEquals("DELETED", row(acmeDocument).status)
             assertEquals("DELETED", row(globexDocument).status)
@@ -292,11 +290,11 @@ class DocumentJourneyIT {
             delete(id).andExpect { status { isServiceUnavailable() } }
             clock.set(START.plus(Duration.ofMinutes(16)))
 
-            assertThrows(ObjectStorageException::class.java) { resumeDeletions.resume() }
+            assertEquals(listOf(id), resumeDeletions.resume().failures.map { it.documentId.value.toString() })
 
             assertEquals("DELETING", row(id).status)
             storage.unavailable = false
-            assertEquals(1, resumeDeletions.resume())
+            assertEquals(listOf(id), resumeDeletions.resume().completed.map { it.value.toString() })
             assertEquals("DELETED", row(id).status)
         }
 
@@ -314,10 +312,10 @@ class DocumentJourneyIT {
             storage.unavailable = false
 
             clock.set(START.plus(Duration.ofMinutes(10)))
-            assertEquals(0, abandonArchivings.abandon())
+            assertTrue(abandonArchivings.abandon().completed.isEmpty())
 
             clock.set(START.plus(Duration.ofMinutes(16)))
-            assertEquals(1, abandonArchivings.abandon())
+            assertEquals(1, abandonArchivings.abandon().completed.size)
 
             assertEquals("FAILED", row(pending.getId().toString()).status)
             assertTrue(storage.keys().isEmpty())
@@ -329,7 +327,7 @@ class DocumentJourneyIT {
             rows.save(row(id).apply { status = "PENDING" })
             clock.set(START.plus(Duration.ofMinutes(16)))
 
-            assertEquals(1, abandonArchivings.abandon())
+            assertEquals(listOf(id), abandonArchivings.abandon().completed.map { it.value.toString() })
 
             assertEquals("FAILED", row(id).status)
             assertTrue(storage.keys().isEmpty())

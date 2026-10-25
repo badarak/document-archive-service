@@ -13,7 +13,7 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -44,7 +44,7 @@ class ResumeDeletionsServiceTest {
         val second = deleting("globex")
         every { documents.findStalled(DocumentStatus.DELETING, now.minus(gracePeriod), 2) } returns listOf(first, second)
 
-        assertEquals(2, service.resume())
+        assertEquals(listOf(first.id, second.id), service.resume().completed)
 
         verify { storage.delete(first.file.objectKey) }
         verify { storage.delete(second.file.objectKey) }
@@ -54,36 +54,37 @@ class ResumeDeletionsServiceTest {
     }
 
     @Test
-    fun `a deletion another run finished meanwhile is not counted`() {
+    fun `a deletion another run finished meanwhile is not reported`() {
         val first = deleting("acme")
         val second = deleting("acme")
         every { documents.findStalled(any(), any(), any()) } returns listOf(first, second)
         every { documents.transition(match { it.id == second.id }, DocumentStatus.DELETING) } returns false
 
-        assertEquals(1, service.resume())
+        assertEquals(listOf(first.id), service.resume().completed)
     }
 
     @Test
     fun `nothing is done when no deletion is stalled`() {
         every { documents.findStalled(any(), any(), any()) } returns emptyList()
 
-        assertEquals(0, service.resume())
+        assertTrue(service.resume().completed.isEmpty())
 
         verify(exactly = 0) { storage.delete(any()) }
     }
 
     @Test
-    fun `stops at the first storage failure, keeping the deletions already finished`() {
+    fun `a deletion whose content cannot be removed stays deleting, without holding back the others`() {
         val first = deleting("acme")
         val second = deleting("acme")
         val third = deleting("acme")
         every { documents.findStalled(any(), any(), any()) } returns listOf(first, second, third)
-        every { storage.delete(second.file.objectKey) } throws ObjectStorageException("Storage down", RuntimeException())
+        every { storage.delete(second.file.objectKey) } throws ObjectStorageException("Object locked", RuntimeException())
 
-        assertThrows(ObjectStorageException::class.java) { service.resume() }
+        val outcome = service.resume()
 
-        assertEquals(listOf(first.id), saved.map { it.id })
-        verify(exactly = 0) { storage.delete(third.file.objectKey) }
+        assertEquals(listOf(first.id, third.id), outcome.completed)
+        assertEquals(listOf(second.id), outcome.failures.map { it.documentId })
+        assertEquals(listOf(first.id, third.id), saved.map { it.id })
     }
 
     private fun deleting(tenant: String) = aDocument(DocumentStatus.DELETING, tenant = tenant)

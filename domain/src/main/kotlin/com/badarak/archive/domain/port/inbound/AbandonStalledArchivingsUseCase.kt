@@ -8,10 +8,11 @@ interface AbandonStalledArchivingsUseCase {
      * ones may still be uploading and are left alone. The caller of such an archiving got an error and archives the file
      * again as a new document, so none is ever made AVAILABLE here. Running it on several instances at once is harmless.
      *
-     * @return the number of archivings abandoned by this call, leaving out those another run abandoned meanwhile
-     * @throws com.badarak.archive.domain.port.outbound.ObjectStorageException when the storage cannot be reached; the
-     * archivings abandoned before are kept and the others wait for the next call
-     * @throws com.badarak.archive.domain.port.outbound.DocumentPersistenceException when the document store cannot be reached
+     * Each archiving is abandoned on its own: one that fails stays PENDING for the next call without holding back the
+     * others, and the call stops after several failures in a row (see [ReconciliationOutcome]).
+     *
+     * @return the archivings abandoned by this call, and those it could not abandon
+     * @throws com.badarak.archive.domain.port.outbound.DocumentPersistenceException when the stalled archivings cannot be read
      */
-    fun abandon(): Int
+    fun abandon(): ReconciliationOutcome
 }

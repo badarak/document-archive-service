@@ -15,7 +15,7 @@ import io.mockk.runs
 import io.mockk.verify
 import io.mockk.verifyOrder
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -46,7 +46,7 @@ class AbandonStalledArchivingsServiceTest {
         val second = pending("globex")
         every { documents.findStalled(DocumentStatus.PENDING, now.minus(gracePeriod), 2) } returns listOf(first, second)
 
-        assertEquals(2, service.abandon())
+        assertEquals(listOf(first.id, second.id), service.abandon().completed)
 
         assertEquals(listOf(first.id, second.id), saved.map { it.id })
         assertEquals(listOf(DocumentStatus.FAILED, DocumentStatus.FAILED), saved.map { it.status })
@@ -67,36 +67,37 @@ class AbandonStalledArchivingsServiceTest {
     }
 
     @Test
-    fun `an archiving another run abandoned meanwhile is not counted`() {
+    fun `an archiving another run abandoned meanwhile is not reported`() {
         val first = pending("acme")
         val second = pending("acme")
         every { documents.findStalled(any(), any(), any()) } returns listOf(first, second)
         every { documents.transition(match { it.id == second.id }, DocumentStatus.PENDING) } returns false
 
-        assertEquals(1, service.abandon())
+        assertEquals(listOf(first.id), service.abandon().completed)
     }
 
     @Test
     fun `nothing is done when no archiving is stalled`() {
         every { documents.findStalled(any(), any(), any()) } returns emptyList()
 
-        assertEquals(0, service.abandon())
+        assertTrue(service.abandon().completed.isEmpty())
 
         verify(exactly = 0) { storage.delete(any()) }
     }
 
     @Test
-    fun `a document whose content cannot be removed stays pending, and the batch stops there`() {
+    fun `a document whose content cannot be removed stays pending, without holding back the others`() {
         val first = pending("acme")
         val second = pending("acme")
         val third = pending("acme")
         every { documents.findStalled(any(), any(), any()) } returns listOf(first, second, third)
-        every { storage.delete(second.file.objectKey) } throws ObjectStorageException("Storage down", RuntimeException())
+        every { storage.delete(second.file.objectKey) } throws ObjectStorageException("Object locked", RuntimeException())
 
-        assertThrows(ObjectStorageException::class.java) { service.abandon() }
+        val outcome = service.abandon()
 
-        assertEquals(listOf(first.id), saved.map { it.id })
-        verify(exactly = 0) { storage.delete(third.file.objectKey) }
+        assertEquals(listOf(first.id, third.id), outcome.completed)
+        assertEquals(listOf(second.id), outcome.failures.map { it.documentId })
+        assertEquals(listOf(first.id, third.id), saved.map { it.id })
     }
 
     @Test
@@ -105,8 +106,8 @@ class AbandonStalledArchivingsServiceTest {
         every { documents.findStalled(any(), any(), any()) } returns listOf(stalled)
         every { documents.transition(any(), any()) } throws DocumentPersistenceException("Database down", RuntimeException()) andThen true
 
-        assertThrows(DocumentPersistenceException::class.java) { service.abandon() }
-        assertEquals(1, service.abandon())
+        assertEquals(listOf(stalled.id), service.abandon().failures.map { it.documentId })
+        assertEquals(listOf(stalled.id), service.abandon().completed)
 
         verify(exactly = 2) { storage.delete(stalled.file.objectKey) }
     }

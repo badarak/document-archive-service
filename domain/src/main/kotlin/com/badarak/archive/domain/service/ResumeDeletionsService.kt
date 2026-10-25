@@ -2,6 +2,7 @@ package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.StalledDocumentsPolicy
+import com.badarak.archive.domain.port.inbound.ReconciliationOutcome
 import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
@@ -16,8 +17,8 @@ class ResumeDeletionsService(
 
     private val deletion = DocumentDeletion(documents, storage, clock)
 
-    override fun resume(): Int {
+    override fun resume(): ReconciliationOutcome {
         val stalled = documents.findStalled(DocumentStatus.DELETING, policy.stalledBefore(clock.instant()), policy.batchSize)
-        return stalled.count(deletion::finish)
+        return StalledDocumentsReconciliation.reconcile(stalled, deletion::finish)
     }
 }

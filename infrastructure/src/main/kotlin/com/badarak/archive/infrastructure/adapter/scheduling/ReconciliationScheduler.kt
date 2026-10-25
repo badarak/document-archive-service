@@ -1,6 +1,7 @@
 package com.badarak.archive.infrastructure.adapter.scheduling
 
 import com.badarak.archive.domain.port.inbound.AbandonStalledArchivingsUseCase
+import com.badarak.archive.domain.port.inbound.ReconciliationOutcome
 import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.infrastructure.config.ReconciliationProperties
 import org.slf4j.LoggerFactory
@@ -31,16 +32,38 @@ class ReconciliationScheduler(
     }
 
     fun run() {
-        reconcile("deletions left in progress", "finished") { resumeDeletions.resume() }
-        reconcile("archivings left pending", "abandoned") { abandonArchivings.abandon() }
+        reconcile(DELETIONS) { resumeDeletions.resume() }?.let { outcome ->
+            if (outcome.completed.isNotEmpty()) log.info("Reconciliation finished {} {}", outcome.completed.size, DELETIONS)
+        }
+        reconcile(ARCHIVINGS) { abandonArchivings.abandon() }?.completed?.forEach {
+            log.warn("Reconciliation abandoned the archiving of document {}, left pending beyond its grace period", it)
+        }
     }
 
-    private fun reconcile(subject: String, outcome: String, step: () -> Int) {
-        try {
-            val count = step()
-            if (count > 0) log.info("Reconciliation {} {} {}", outcome, count, subject)
-        } catch (e: RuntimeException) {
-            log.warn("Reconciliation of the {} interrupted, retried at the next run: {}", subject, e.message, e)
+    private fun reconcile(subject: String, step: () -> ReconciliationOutcome): ReconciliationOutcome? = try {
+        step().also { report(subject, it) }
+    } catch (e: RuntimeException) {
+        log.warn("Reconciliation of the {} interrupted, retried at the next run: {}", subject, e.message, e)
+        null
+    }
+
+    private fun report(subject: String, outcome: ReconciliationOutcome) {
+        outcome.failures.forEach {
+            log.warn(
+                "Reconciliation of document {} among the {} failed, retried at the next run: {}",
+                it.documentId,
+                subject,
+                it.cause.message,
+                it.cause,
+            )
         }
+        if (outcome.interrupted) {
+            log.warn("Reconciliation of the {} interrupted after several failures in a row, retried at the next run", subject)
+        }
+    }
+
+    private companion object {
+        const val DELETIONS = "deletions left in progress"
+        const val ARCHIVINGS = "archivings left pending"
     }
 }

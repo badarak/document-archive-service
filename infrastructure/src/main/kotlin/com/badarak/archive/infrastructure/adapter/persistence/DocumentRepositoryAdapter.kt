@@ -11,6 +11,7 @@ import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.PageRequest
+import com.badarak.archive.domain.model.StalledBacklog
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
@@ -70,6 +71,12 @@ class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocume
         repository.findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(status.name, updatedBefore, Limit.of(limit)).mapNotNull(::toStalled)
     } catch (e: DataAccessException) {
         throw DocumentPersistenceException("Could not read the documents left $status", e)
+    }
+
+    override fun measureStalled(status: DocumentStatus, updatedBefore: Instant): StalledBacklog = try {
+        repository.measureStalled(status.name, updatedBefore).let { StalledBacklog(it.stalled, it.oldest) }
+    } catch (e: DataAccessException) {
+        throw DocumentPersistenceException("Could not measure the documents left $status", e)
     }
 
     private fun toStalled(row: ArchivedDocumentEntity): ArchivedDocument? = try {

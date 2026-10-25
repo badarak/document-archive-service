@@ -134,6 +134,22 @@ statement: of two concurrent changes, such as a deletion replayed during the rec
 one applies. An upload that completes after its archiving was abandoned removes its content and is
 answered with `503` instead of making the document `AVAILABLE`.
 
+The reconciliation handles each document on its own: one that fails, such as an object the storage
+refuses to delete, stays in its status for the next run without holding back the others, and a row
+that no longer meets the domain rules is left out. A run stops after three failures in a row, the
+sign of an outage. Every abandoned archiving and every failure is logged as a warning, and each run
+publishes Micrometer metrics, tagged with `status` (`pending` or `deleting`), ready for any exporter:
+
+| Metric | Meaning |
+|---|---|
+| `archive.reconciliation.backlog` | Documents still stalled after the last run |
+| `archive.reconciliation.backlog.oldest.age` | Seconds since the oldest of them was last updated |
+| `archive.reconciliation.documents` | Documents moved on or not, tagged `outcome` (`completed`, `failed`) |
+| `archive.reconciliation.runs` | Runs, tagged `outcome` (`completed`, `interrupted`, `failed`) |
+
+A backlog that grows, or an oldest age far above the grace period, means the reconciliation is
+blocked or disabled.
+
 ## Security
 
 The service is an OAuth2 resource server: callers authenticate with a JWT access token sent in the

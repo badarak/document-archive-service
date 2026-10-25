@@ -3,6 +3,7 @@ package com.badarak.archive.domain.service
 import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentStatus
+import com.badarak.archive.domain.model.StalledBacklog
 import com.badarak.archive.domain.model.StalledDocumentsPolicy
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
@@ -38,6 +39,7 @@ class AbandonStalledArchivingsServiceTest {
         every { documents.create(capture(saved)) } just runs
         every { documents.transition(capture(saved), any()) } returns true
         every { storage.delete(any()) } just runs
+        every { documents.measureStalled(any(), any()) } returns StalledBacklog.EMPTY
     }
 
     @Test
@@ -110,6 +112,15 @@ class AbandonStalledArchivingsServiceTest {
         assertEquals(listOf(stalled.id), service.abandon().completed)
 
         verify(exactly = 2) { storage.delete(stalled.file.objectKey) }
+    }
+
+    @Test
+    fun `reports the documents still stalled once the batch is over`() {
+        val backlog = StalledBacklog(250, now.minus(Duration.ofHours(3)))
+        every { documents.findStalled(any(), any(), any()) } returns emptyList()
+        every { documents.measureStalled(DocumentStatus.PENDING, now.minus(gracePeriod)) } returns backlog
+
+        assertEquals(backlog, service.abandon().backlog)
     }
 
     private fun pending(tenant: String) = aDocument(DocumentStatus.PENDING, tenant = tenant)

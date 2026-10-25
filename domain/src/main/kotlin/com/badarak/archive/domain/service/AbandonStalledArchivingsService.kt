@@ -18,7 +18,11 @@ class AbandonStalledArchivingsService(
     private val failure = ArchivingFailure(documents, storage, clock)
 
     override fun abandon(): ReconciliationOutcome {
-        val stalled = documents.findStalled(DocumentStatus.PENDING, policy.stalledBefore(clock.instant()), policy.batchSize)
-        return StalledDocumentsReconciliation.reconcile(stalled, failure::record)
+        val stalledBefore = policy.stalledBefore(clock.instant())
+        return StalledDocumentsReconciliation.reconcile(
+            stalled = documents.findStalled(DocumentStatus.PENDING, stalledBefore, policy.batchSize),
+            backlog = { documents.measureStalled(DocumentStatus.PENDING, stalledBefore) },
+            step = failure::record,
+        )
     }
 }

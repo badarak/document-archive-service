@@ -6,6 +6,7 @@ import com.badarak.archive.domain.model.DocumentPage
 import com.badarak.archive.domain.model.DocumentSearchCriteria
 import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.PageRequest
+import com.badarak.archive.domain.model.StalledBacklog
 import com.badarak.archive.domain.model.TenantId
 import java.time.Instant
 
@@ -52,6 +53,14 @@ interface DocumentRepository {
      * @throws DocumentPersistenceException when the store cannot be reached
      */
     fun findStalled(status: DocumentStatus, updatedBefore: Instant, limit: Int): List<ArchivedDocument>
+
+    /**
+     * Counts the documents in [status] last updated before [updatedBefore], whatever their tenant, with the last update of
+     * the oldest one, in a single read. Reserved to internal maintenance tasks, like [findStalled].
+     *
+     * @throws DocumentPersistenceException when the store cannot be reached
+     */
+    fun measureStalled(status: DocumentStatus, updatedBefore: Instant): StalledBacklog
 }
 
 class DocumentPersistenceException(message: String, cause: Throwable) : RuntimeException(message, cause)

@@ -9,6 +9,7 @@ import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.PageRequest
+import com.badarak.archive.domain.model.StalledBacklog
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
@@ -239,6 +240,25 @@ class DocumentRepositoryAdapterIT {
         stored(status = DocumentStatus.DELETING, createdAt = createdAt.plusSeconds(1))
 
         assertEquals(listOf(oldest.id), adapter.findStalled(DocumentStatus.DELETING, later.plusSeconds(60), 1).map { it.id })
+    }
+
+    @Test
+    fun `the stalled documents are counted whatever their tenant, with the last update of the oldest`() {
+        stored(tenant = "acme", status = DocumentStatus.PENDING, createdAt = createdAt)
+        stored(tenant = "globex", status = DocumentStatus.PENDING, createdAt = createdAt.plusSeconds(1))
+        stored(tenant = "acme", status = DocumentStatus.PENDING, createdAt = createdAt.plusSeconds(2))
+        stored(tenant = "acme", status = DocumentStatus.DELETING, createdAt = createdAt)
+
+        val backlog = adapter.measureStalled(DocumentStatus.PENDING, createdAt.plusSeconds(2))
+
+        assertEquals(StalledBacklog(2, createdAt), backlog)
+    }
+
+    @Test
+    fun `no stalled document makes an empty backlog`() {
+        stored(status = DocumentStatus.PENDING, createdAt = createdAt)
+
+        assertEquals(StalledBacklog.EMPTY, adapter.measureStalled(DocumentStatus.PENDING, createdAt))
     }
 
     private fun stored(

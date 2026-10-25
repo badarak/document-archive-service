@@ -3,6 +3,7 @@ package com.badarak.archive.domain.service
 import com.badarak.archive.domain.fixture.aDocument
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.DocumentStatus
+import com.badarak.archive.domain.model.StalledBacklog
 import com.badarak.archive.domain.model.StalledDocumentsPolicy
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
@@ -36,6 +37,7 @@ class ResumeDeletionsServiceTest {
         every { documents.create(capture(saved)) } just runs
         every { documents.transition(capture(saved), any()) } returns true
         every { storage.delete(any()) } just runs
+        every { documents.measureStalled(any(), any()) } returns StalledBacklog.EMPTY
     }
 
     @Test
@@ -85,6 +87,15 @@ class ResumeDeletionsServiceTest {
         assertEquals(listOf(first.id, third.id), outcome.completed)
         assertEquals(listOf(second.id), outcome.failures.map { it.documentId })
         assertEquals(listOf(first.id, third.id), saved.map { it.id })
+    }
+
+    @Test
+    fun `reports the documents still stalled once the batch is over`() {
+        val backlog = StalledBacklog(250, now.minus(Duration.ofHours(3)))
+        every { documents.findStalled(any(), any(), any()) } returns emptyList()
+        every { documents.measureStalled(DocumentStatus.DELETING, now.minus(gracePeriod)) } returns backlog
+
+        assertEquals(backlog, service.resume().backlog)
     }
 
     private fun deleting(tenant: String) = aDocument(DocumentStatus.DELETING, tenant = tenant)

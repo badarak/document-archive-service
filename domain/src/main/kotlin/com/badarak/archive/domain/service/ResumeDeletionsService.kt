@@ -18,7 +18,11 @@ class ResumeDeletionsService(
     private val deletion = DocumentDeletion(documents, storage, clock)
 
     override fun resume(): ReconciliationOutcome {
-        val stalled = documents.findStalled(DocumentStatus.DELETING, policy.stalledBefore(clock.instant()), policy.batchSize)
-        return StalledDocumentsReconciliation.reconcile(stalled, deletion::finish)
+        val stalledBefore = policy.stalledBefore(clock.instant())
+        return StalledDocumentsReconciliation.reconcile(
+            stalled = documents.findStalled(DocumentStatus.DELETING, stalledBefore, policy.batchSize),
+            backlog = { documents.measureStalled(DocumentStatus.DELETING, stalledBefore) },
+            step = deletion::finish,
+        )
     }
 }

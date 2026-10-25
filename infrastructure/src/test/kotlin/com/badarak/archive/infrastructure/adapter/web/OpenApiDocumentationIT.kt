@@ -2,6 +2,7 @@ package com.badarak.archive.infrastructure.adapter.web
 
 import org.hamcrest.Matchers.contains
 import org.hamcrest.Matchers.containsInAnyOrder
+import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -27,7 +28,6 @@ class OpenApiDocumentationIT {
             jsonPath("$.paths['/api/v1/documents'].post.summary") { value("Archive a document") }
             jsonPath("$.paths['/api/v1/documents'].post.tags[0]") { value("Documents") }
             jsonPath("$.paths['/api/v1/documents'].post.parameters") { doesNotExist() }
-            jsonPath("$.paths['/api/v1/documents'].post.security[0]['bearer-jwt']") { exists() }
             jsonPath("$.paths['/api/v1/documents'].post.requestBody.content['multipart/form-data'].schema.properties.file") { exists() }
             jsonPath("$.paths['/api/v1/documents'].post.requestBody.content['multipart/form-data'].schema.properties.metadata") { exists() }
             jsonPath("$.paths['/api/v1/documents'].post.requestBody.content['multipart/form-data'].encoding.metadata.contentType") {
@@ -46,6 +46,25 @@ class OpenApiDocumentationIT {
             jsonPath("$.paths['/api/v1/documents/{id}'].delete.summary") { value("Delete a document") }
             jsonPath("$.paths['/api/v1/documents/{id}'].delete.responses['204']") { exists() }
             jsonPath("$.components.securitySchemes['bearer-jwt'].scheme") { value("bearer") }
+        }
+    }
+
+    @Test
+    fun `the OpenAPI description presents the API`() {
+        mockMvc.get("/v3/api-docs").andExpect {
+            status { isOk() }
+            jsonPath("$.info.title") { value("Document Archive Service") }
+            jsonPath("$.info.version") { value("v1") }
+            jsonPath("$.info.description") { value(startsWith("Archives documents for other services")) }
+        }
+    }
+
+    @Test
+    fun `by default, the only way to authenticate is to paste a bearer token`() {
+        mockMvc.get("/v3/api-docs").andExpect {
+            status { isOk() }
+            jsonPath("$.security[*]") { value(contains(mapOf("bearer-jwt" to emptyList<String>()))) }
+            jsonPath("$.components.securitySchemes.oauth2") { doesNotExist() }
         }
     }
 

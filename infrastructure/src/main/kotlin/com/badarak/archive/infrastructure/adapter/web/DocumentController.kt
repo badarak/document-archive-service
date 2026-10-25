@@ -11,7 +11,6 @@ import com.badarak.archive.domain.port.inbound.DownloadDocumentUseCase
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
 import com.badarak.archive.domain.port.inbound.SearchDocumentsUseCase
 import com.badarak.archive.domain.port.inbound.UploadedFile
-import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.core.io.InputStreamResource
 import org.springframework.core.io.Resource
@@ -32,7 +31,6 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 @Tag(name = "Documents", description = "Archiving of documents sent by other services")
-@SecurityRequirement(name = OpenApiConfiguration.BEARER_JWT)
 @RestController
 @RequestMapping(DocumentApi.PATH)
 class DocumentController(

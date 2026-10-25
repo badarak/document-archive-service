@@ -188,9 +188,17 @@ TOKEN=$(curl -s http://localhost:8180/realms/archive/protocol/openid-connect/tok
 curl -H "Authorization: Bearer $TOKEN" "http://localhost:8080/api/v1/documents?documentType=INVOICE"
 ```
 
-The same token can be pasted in the Swagger UI, under *Authorize*. A token of `globex-billing-service`
-never sees the documents of `acme`, and a token without the required scope gets `403`. Token
-validation is also covered by the integration tests, which sign their own tokens.
+A token of `globex-billing-service` never sees the documents of `acme`, and a token without the
+required scope gets `403`. Token validation is also covered by the integration tests, which sign
+their own tokens.
+
+### Getting a token from the Swagger UI
+
+With the `local` profile, the Swagger UI gets the token itself: under *Authorize*, in the `oauth2`
+section, tick the scopes and click *Authorize*. It acts as `billing-service`, the calling service of
+the `acme` tenant, whose client id and secret it reads from `.env`. To act for `globex`, replace them
+with `globex-billing-service` and its secret in the same dialog, or paste any token in the
+`bearer-jwt` section.
 
 ## Tests
 

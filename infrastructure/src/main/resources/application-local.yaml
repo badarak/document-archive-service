@@ -7,7 +7,25 @@ spring:
       - optional:file:../.env[.properties]
 
 springdoc:
+  open-api:
+    components:
+      securitySchemes:
+        oauth2:
+          type: oauth2
+          flows:
+            clientCredentials:
+              tokenUrl: ${ARCHIVE_JWT_ISSUER}/protocol/openid-connect/token
+              scopes:
+                "[documents:read]": Search, read and download the documents of the tenant
+                "[documents:write]": Archive documents
+                "[documents:delete]": Delete documents
+    security:
+      - bearer-jwt: []
+      - oauth2: []
   api-docs:
     enabled: ${ARCHIVE_OPENAPI_ENABLED:true}
   swagger-ui:
     enabled: ${ARCHIVE_OPENAPI_ENABLED:true}
+    oauth:
+      client-id: billing-service
+      client-secret: ${ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET}

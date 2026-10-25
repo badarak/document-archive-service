@@ -3,6 +3,7 @@
 - Date : 2026-10-20.
 - Point de départ : `master` (`f859e42`, après ARC-308).
 - Périmètre : tout le code de production (~2 100 lignes) et un survol des tests (~4 400 lignes).
+- Rédaction : avec Claude (Anthropic), via Claude Code ; relue par le mainteneur.
 - Aucune modification n'a été faite.
 
 ## Suivi

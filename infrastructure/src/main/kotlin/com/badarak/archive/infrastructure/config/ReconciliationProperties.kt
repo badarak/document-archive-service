@@ -5,7 +5,6 @@ import java.time.Duration
 
 @ConfigurationProperties("archive.reconciliation")
 class ReconciliationProperties(
-    val enabled: Boolean = true,
     val interval: Duration = Duration.ofMinutes(5),
     val gracePeriod: Duration = Duration.ofMinutes(15),
     val batchSize: Int = 100,

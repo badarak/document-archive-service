@@ -17,7 +17,7 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar
  */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
-@ConditionalOnBooleanProperty("archive.reconciliation.enabled")
+@ConditionalOnBooleanProperty("archive.reconciliation.enabled", matchIfMissing = true)
 class ReconciliationScheduler(
     private val resumeDeletions: ResumeDeletionsUseCase,
     private val abandonArchivings: AbandonStalledArchivingsUseCase,

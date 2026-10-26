@@ -79,6 +79,7 @@ one is missing.
 | `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
+| `MANAGEMENT_SERVER_PORT` | Optional. Port of the actuator endpoints (health probes and Prometheus), the application port by default; a separate port keeps them off the public network |
 | `ARCHIVE_LOG_FORMAT` | Optional. Console log format: `ecs` (JSON lines, by default), `logstash`, `gelf`, or empty for the readable format of the `local` profile |
 | `ARCHIVE_LOG_TENANT` | Optional. Whether the log line of each API operation names the tenant of the caller (`false` by default) |
 | `ARCHIVE_SHUTDOWN_TIMEOUT` | Optional. Longest wait for the requests in progress on shutdown (`150s` by default). Keep it above `ARCHIVE_S3_API_CALL_TIMEOUT`, and give the orchestrator at least as long before it kills the process |
@@ -176,6 +177,10 @@ Micrometer records, tagged with `application`:
 
 No identifier is ever a tag: the document and the tenant belong to the logs.
 
+Prometheus scrapes them at `/actuator/prometheus`, with a token carrying the `metrics:read` scope
+(`authorization` in its scrape configuration). Set `MANAGEMENT_SERVER_PORT` to serve the actuator
+endpoints, the probes included, on a port of their own that the public network does not reach.
+
 ## Security
 
 The service is an OAuth2 resource server: callers authenticate with a JWT access token sent in the
@@ -184,6 +189,7 @@ The service is an OAuth2 resource server: callers authenticate with a JWT access
 | Request | Requirement |
 |---|---|
 | `/actuator/health` and its probes | None, so monitoring can call them |
+| `GET /actuator/prometheus` | Valid token with the `metrics:read` scope; the Prometheus scraping endpoint |
 | `/.well-known/oauth-protected-resource` | None; standard metadata published by Spring Security (the service URL and the bearer method) |
 | `/v3/api-docs` and `/swagger-ui/**` | None; the OpenAPI description of the API, when `ARCHIVE_OPENAPI_ENABLED` is true |
 | `GET /api/v1/documents/**` (read, search, download) | Valid token with the `documents:read` scope |

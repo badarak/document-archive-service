@@ -103,8 +103,9 @@ management:
   endpoints:
     web:
       exposure:
-        # Only the health endpoint is reachable over HTTP; it is what the monitoring probes call.
-        include: health
+        # The health endpoint, open to the probes, and the Prometheus scraping endpoint, which requires the metrics:read
+        # scope. Setting MANAGEMENT_SERVER_PORT moves both to a port of their own, to keep off the public network.
+        include: health,prometheus
   endpoint:
     health:
       show-details: never

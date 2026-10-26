@@ -20,9 +20,9 @@ Run every command from the project root.
 cp .env.example .env
 ```
 
-Then fill in the eight empty values in `.env`: the database username and password, the object
+Then fill in the nine empty values in `.env`: the database username and password, the object
 storage access key and secret key (at least 8 characters), the Keycloak admin username and password,
-and the secrets of the two calling services. Any value works locally; the same file configures both
+the secrets of the two calling services and the secret of the Prometheus scraper. Any value works locally; the same file configures both
 the containers and the application. `.env` is ignored by git.
 
 An existing `.env` must also get the `ARCHIVE_KEYCLOAK_*` variables of `.env.example`: Docker Compose
@@ -76,6 +76,7 @@ one is missing.
 | `ARCHIVE_S3_PORT`, `ARCHIVE_S3_CONSOLE_PORT` | Published ports of the MinIO container |
 | `ARCHIVE_KEYCLOAK_PORT`, `ARCHIVE_KEYCLOAK_ADMIN_USERNAME`, `ARCHIVE_KEYCLOAK_ADMIN_PASSWORD` | Published port and admin account of the Keycloak container |
 | `ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET`, `ARCHIVE_KEYCLOAK_GLOBEX_CLIENT_SECRET` | Secrets of the two calling services declared in the local realm |
+| `ARCHIVE_KEYCLOAK_PROMETHEUS_CLIENT_SECRET` | Secret of the `prometheus` client of the local realm, whose tokens carry only the `metrics:read` scope |
 | `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
@@ -182,6 +183,17 @@ No identifier is ever a tag: the document and the tenant belong to the logs.
 Prometheus scrapes them at `/actuator/prometheus`, with a token carrying the `metrics:read` scope
 (`authorization` in its scrape configuration). Set `MANAGEMENT_SERVER_PORT` to serve the actuator
 endpoints, the probes included, on a port of their own that the public network does not reach.
+
+Locally, the `prometheus` client of the Keycloak realm gets such a token:
+
+```bash
+source .env
+TOKEN=$(curl -s http://localhost:8180/realms/archive/protocol/openid-connect/token \
+  -d grant_type=client_credentials -d client_id=prometheus \
+  -d client_secret="$ARCHIVE_KEYCLOAK_PROMETHEUS_CLIENT_SECRET" | jq -r .access_token)
+
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/actuator/prometheus | grep '^archive_'
+```
 
 ### Traces
 

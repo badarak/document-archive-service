@@ -80,6 +80,8 @@ one is missing.
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
 | `MANAGEMENT_SERVER_PORT` | Optional. Port of the actuator endpoints (health probes and Prometheus), the application port by default; a separate port keeps them off the public network |
+| `ARCHIVE_TRACING_SAMPLING` | Optional. Share of the requests whose trace is recorded, from `0` to `1` (`0.1` by default, `1.0` with the `local` profile) |
+| `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` | Optional. OTLP endpoint of the collector the recorded traces are sent to, such as `http://otel-collector:4318/v1/traces`; none by default |
 | `ARCHIVE_LOG_FORMAT` | Optional. Console log format: `ecs` (JSON lines, by default), `logstash`, `gelf`, or empty for the readable format of the `local` profile |
 | `ARCHIVE_LOG_TENANT` | Optional. Whether the log line of each API operation names the tenant of the caller (`false` by default) |
 | `ARCHIVE_SHUTDOWN_TIMEOUT` | Optional. Longest wait for the requests in progress on shutdown (`150s` by default). Keep it above `ARCHIVE_S3_API_CALL_TIMEOUT`, and give the orchestrator at least as long before it kills the process |
@@ -180,6 +182,16 @@ No identifier is ever a tag: the document and the tenant belong to the logs.
 Prometheus scrapes them at `/actuator/prometheus`, with a token carrying the `metrics:read` scope
 (`authorization` in its scrape configuration). Set `MANAGEMENT_SERVER_PORT` to serve the actuator
 endpoints, the probes included, on a port of their own that the public network does not reach.
+
+### Traces
+
+Every request gets a W3C trace, continued from the `traceparent` header of the caller when it sends
+one. Its `traceId` is in every log line of the request and in every error answer, so that a caller
+can report the exact request that failed. A share of the traces is recorded (`ARCHIVE_TRACING_SAMPLING`,
+10% by default, all of them with the `local` profile), with a span per API operation and per storage
+call, and sent to an OpenTelemetry collector once
+`MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` names one. The metrics are not pushed over
+OTLP: Prometheus scrapes them.
 
 ## Security
 

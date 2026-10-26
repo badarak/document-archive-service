@@ -96,6 +96,16 @@ springdoc:
     enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
 
 management:
+  # Traces: every request gets a trace whose identifier is in the MDC, hence in every log line and error answer. A share
+  # of them is recorded, and sent only once MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT names an OTLP collector.
+  tracing:
+    sampling:
+      probability: ${ARCHIVE_TRACING_SAMPLING:0.1}
+  otlp:
+    metrics:
+      export:
+        # The metrics are scraped by Prometheus; the OpenTelemetry starter would also push them over OTLP.
+        enabled: false
   metrics:
     # Every series names the service, to tell it apart from the others scraped by the same monitoring.
     tags:

@@ -96,6 +96,10 @@ springdoc:
     enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
 
 management:
+  metrics:
+    # Every series names the service, to tell it apart from the others scraped by the same monitoring.
+    tags:
+      application: ${spring.application.name}
   endpoints:
     web:
       exposure:

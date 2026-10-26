@@ -8,6 +8,7 @@ import com.badarak.archive.infrastructure.adapter.persistence.SpringDataArchived
 import com.badarak.archive.infrastructure.journey.InMemoryObjectStorage
 import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import com.jayway.jsonpath.JsonPath
+import io.micrometer.core.instrument.MeterRegistry
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -34,13 +35,17 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
+import java.util.concurrent.TimeUnit
 
-/** The log line written for each operation of the document API, read as the structured logs see it: MDC and key-value pairs. */
+/**
+ * The log line written for each operation of the document API, read as the structured logs see it (MDC and key-value
+ * pairs), and the timer recorded for it.
+ */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(OperationLogIT.Doubles::class)
-class OperationLogIT {
+@Import(ApiOperationFilterIT.Doubles::class)
+class ApiOperationFilterIT {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
@@ -51,7 +56,10 @@ class OperationLogIT {
     @Autowired
     private lateinit var storage: InMemoryObjectStorage
 
-    private val logger = LoggerFactory.getLogger(OperationLogFilter::class.java) as Logger
+    @Autowired
+    private lateinit var meters: MeterRegistry
+
+    private val logger = LoggerFactory.getLogger(ApiOperationFilter::class.java) as Logger
     private val lines = ListAppender<ILoggingEvent>()
 
     @BeforeEach
@@ -128,6 +136,31 @@ class OperationLogIT {
         assertTrue(lines.list.isEmpty())
     }
 
+    @Test
+    fun `each operation is counted and timed by outcome and error code`() {
+        val uploaded = count("archive.upload", "success", "none")
+        val refused = count("archive.upload", "client-error", "unsupported-format")
+        val unauthenticated = count("archive.search", "client-error", "unauthenticated")
+
+        upload(file("invoice.pdf", "application/pdf", PDF))
+        upload(file("notes.txt", "text/plain", "notes".toByteArray()))
+        mockMvc.get(DOCUMENTS)
+
+        assertEquals(uploaded + 1, count("archive.upload", "success", "none"))
+        assertEquals(refused + 1, count("archive.upload", "client-error", "unsupported-format"))
+        assertEquals(unauthenticated + 1, count("archive.search", "client-error", "unauthenticated"))
+        assertTrue(meters.get("archive.upload").timer().totalTime(TimeUnit.NANOSECONDS) > 0)
+    }
+
+    @Test
+    fun `the operation timers carry no identifier among their tags`() {
+        upload(file("invoice.pdf", "application/pdf", PDF))
+
+        val keys = meters.find("archive.upload").timers().flatMap { timer -> timer.id.tags.map { it.key } }.toSet()
+        assertTrue(setOf("outcome", "error.code", "error", "application").containsAll(keys)) { "Unexpected tags in $keys" }
+        assertTrue("application" in keys)
+    }
+
     @Nested
     @TestPropertySource(properties = ["archive.logging.include-tenant=true"])
     inner class WhenThePolicyAllowsTheTenant {
@@ -151,6 +184,9 @@ class OperationLogIT {
     }
 
     private fun file(name: String, contentType: String, content: ByteArray) = MockMultipartFile("file", name, contentType, content)
+
+    private fun count(name: String, outcome: String, errorCode: String): Long =
+        meters.find(name).tag("outcome", outcome).tag("error.code", errorCode).timer()?.count() ?: 0
 
     private fun ILoggingEvent.value(key: String): Any? = keyValuePairs.orEmpty().firstOrNull { it.key == key }?.value
 

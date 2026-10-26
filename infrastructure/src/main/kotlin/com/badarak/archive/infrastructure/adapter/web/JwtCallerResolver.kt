@@ -33,7 +33,7 @@ class JwtCallerResolver(private val claims: CallerClaimsProperties) : HandlerMet
         val authentication = webRequest.userPrincipal as? JwtAuthenticationToken
             ?: throw IllegalStateException("The request reached a document endpoint without a JWT authentication")
         return resolve(authentication.token).also {
-            webRequest.setAttribute(OperationLogFilter.TENANT, it.tenantId.value, RequestAttributes.SCOPE_REQUEST)
+            webRequest.setAttribute(ApiOperationFilter.TENANT, it.tenantId.value, RequestAttributes.SCOPE_REQUEST)
         }
     }
 

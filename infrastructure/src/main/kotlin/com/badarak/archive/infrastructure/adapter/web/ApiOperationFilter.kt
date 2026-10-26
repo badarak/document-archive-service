@@ -1,5 +1,7 @@
 package com.badarak.archive.infrastructure.adapter.web
 
+import io.micrometer.observation.Observation
+import io.micrometer.observation.ObservationRegistry
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -15,18 +17,21 @@ import org.springframework.web.filter.OncePerRequestFilter
 import java.util.UUID
 
 /**
- * Writes one log line per operation of the document API once its answer is complete, the streaming of a download
- * included: the HTTP status, the outcome, the error code and the duration, as key-value pairs for the structured logs. The
- * operation and the document are in the MDC for the whole request, so that every other line it logs carries them too. It
- * runs before Spring Security, so that a refused token is logged as well.
+ * Observes each operation of the document API until its answer is complete, the streaming of a download included. It
+ * runs before Spring Security, so that a refused token counts too.
  *
- * Nothing else from the request is logged, never the content, the token, the file name nor the business reference; the
- * tenant only when [OperationLogProperties.includeTenant] allows it.
+ * - **Log**: one line per operation, with the HTTP status, the outcome, the error code and the duration as key-value
+ * pairs. The operation and the document are in the MDC for the whole request, so that every other line it logs carries
+ * them too. Nothing else from the request is logged, never the content, the token, the file name nor the business
+ * reference; the tenant only when [OperationLogProperties.includeTenant] allows it.
+ * - **Metrics**: an observation named after the operation (`archive.upload`, `archive.download`…), hence a timer that
+ * counts and times the operations, tagged with their `outcome` and `error.code` only: never an identifier.
  */
 @Component
 @Order(SecurityFilterProperties.DEFAULT_FILTER_ORDER - 1)
 @EnableConfigurationProperties(OperationLogProperties::class)
-class OperationLogFilter(private val properties: OperationLogProperties) : OncePerRequestFilter() {
+class ApiOperationFilter(private val properties: OperationLogProperties, private val observations: ObservationRegistry) :
+    OncePerRequestFilter() {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -36,16 +41,23 @@ class OperationLogFilter(private val properties: OperationLogProperties) : OnceP
         val documentId = operation.documentId(request)
         MDC.put(OPERATION, operation.name)
         documentId?.let { MDC.put(DOCUMENT_ID, it.toString()) }
+        val observation = Observation.createNotStarted("archive.${operation.name.lowercase()}", observations).start()
         var failure: Throwable? = null
         try {
-            chain.doFilter(request, response)
+            observation.openScope().use { chain.doFilter(request, response) }
         } catch (e: Throwable) {
             failure = e
+            observation.error(e)
             throw e
         } finally {
             val durationMs = (System.nanoTime() - start) / 1_000_000
+            val outcome = OperationOutcome.of(response.status, failure)
+            val errorCode = errorCode(request, outcome)
+            observation.lowCardinalityKeyValue("outcome", outcome.value)
+                .lowCardinalityKeyValue("error.code", errorCode ?: NONE)
+                .stop()
             if (documentId == null) createdDocument(response)?.let { MDC.put(DOCUMENT_ID, it.toString()) }
-            log(operation, request, response, durationMs, failure)
+            log(operation, request, response.status, outcome, errorCode, durationMs)
             MDC.remove(OPERATION)
             MDC.remove(DOCUMENT_ID)
         }
@@ -54,21 +66,23 @@ class OperationLogFilter(private val properties: OperationLogProperties) : OnceP
     private fun log(
         operation: ApiOperation,
         request: HttpServletRequest,
-        response: HttpServletResponse,
+        status: Int,
+        outcome: OperationOutcome,
+        errorCode: String?,
         durationMs: Long,
-        failure: Throwable?,
     ) {
-        val outcome = OperationOutcome.of(response.status, failure)
-        val errorCode = request.getAttribute(ERROR_CODE) as String? ?: INTERNAL_ERROR.takeIf { outcome == OperationOutcome.SERVER_ERROR }
         val tenant = request.getAttribute(TENANT).takeIf { properties.includeTenant }
         log.atLevel(if (outcome == OperationOutcome.SERVER_ERROR) Level.ERROR else Level.INFO)
-            .addKeyValue("status", response.status)
+            .addKeyValue("status", status)
             .addKeyValue("outcome", outcome.value)
             .addKeyValue("durationMs", durationMs)
             .apply { errorCode?.let { addKeyValue("errorCode", it) } }
             .apply { tenant?.let { addKeyValue("tenantId", it) } }
-            .log("{} answered {}{} in {} ms", operation, response.status, errorCode?.let { " ($it)" }.orEmpty(), durationMs)
+            .log("{} answered {}{} in {} ms", operation, status, errorCode?.let { " ($it)" }.orEmpty(), durationMs)
     }
+
+    private fun errorCode(request: HttpServletRequest, outcome: OperationOutcome): String? =
+        request.getAttribute(ERROR_CODE) as String? ?: INTERNAL_ERROR.takeIf { outcome == OperationOutcome.SERVER_ERROR }
 
     private fun createdDocument(response: HttpServletResponse): UUID? =
         response.getHeader(HttpHeaders.LOCATION)?.substringAfterLast('/')?.let { runCatching { UUID.fromString(it) }.getOrNull() }
@@ -83,6 +97,7 @@ class OperationLogFilter(private val properties: OperationLogProperties) : OnceP
         private const val OPERATION = "operation"
         private const val DOCUMENT_ID = "documentId"
         private const val INTERNAL_ERROR = "internal-error"
+        private const val NONE = "none"
     }
 }
 

@@ -164,6 +164,17 @@ pairs `status`, `outcome` (`success`, `client-error`, `server-error`), `duration
 refused by the security are logged too. The content, the token, the storage credentials, the file
 name and the business reference are never logged.
 
+### Metrics
+
+Micrometer records, tagged with `application`:
+
+| Metric | Type | Tags |
+|---|---|---|
+| `archive.upload`, `archive.download`, `archive.delete`, `archive.read`, `archive.search` | Timer: count and duration of each API operation, downloads streamed to their end | `outcome` (`success`, `client-error`, `server-error`), `error.code` (`none` on success) |
+| `archive.reconciliation.*` | See the reconciliation above | `status` |
+
+No identifier is ever a tag: the document and the tenant belong to the logs.
+
 ## Security
 
 The service is an OAuth2 resource server: callers authenticate with a JWT access token sent in the

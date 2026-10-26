@@ -80,7 +80,7 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
     ): ResponseEntity<Any>? = super.handleMaxUploadSizeExceededException(ex, headers, status, request)
         ?.also {
             (it.body as? ProblemDetail)?.setProperty(CODE, DOCUMENT_TOO_LARGE)
-            request.setAttribute(OperationLogFilter.ERROR_CODE, DOCUMENT_TOO_LARGE, RequestAttributes.SCOPE_REQUEST)
+            request.setAttribute(ApiOperationFilter.ERROR_CODE, DOCUMENT_TOO_LARGE, RequestAttributes.SCOPE_REQUEST)
         }
 
     private fun unavailable(error: RuntimeException): ProblemDetail {
@@ -94,7 +94,7 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
     }
 
     private fun problem(status: HttpStatus, code: String, detail: String?): ProblemDetail {
-        RequestContextHolder.getRequestAttributes()?.setAttribute(OperationLogFilter.ERROR_CODE, code, RequestAttributes.SCOPE_REQUEST)
+        RequestContextHolder.getRequestAttributes()?.setAttribute(ApiOperationFilter.ERROR_CODE, code, RequestAttributes.SCOPE_REQUEST)
         return ProblemDetail.forStatusAndDetail(status, detail).apply { setProperty(CODE, code) }
     }
 

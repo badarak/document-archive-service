@@ -79,6 +79,8 @@ one is missing.
 | `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
+| `ARCHIVE_LOG_FORMAT` | Optional. Console log format: `ecs` (JSON lines, by default), `logstash`, `gelf`, or empty for the readable format of the `local` profile |
+| `ARCHIVE_LOG_TENANT` | Optional. Whether the log line of each API operation names the tenant of the caller (`false` by default) |
 | `ARCHIVE_SHUTDOWN_TIMEOUT` | Optional. Longest wait for the requests in progress on shutdown (`150s` by default). Keep it above `ARCHIVE_S3_API_CALL_TIMEOUT`, and give the orchestrator at least as long before it kills the process |
 | `ARCHIVE_JWT_ISSUER`, `ARCHIVE_JWT_JWKS_URI`, `ARCHIVE_JWT_AUDIENCE` | Access token validation, see [Security](#security) |
 | `ARCHIVE_JWT_TENANT_CLAIM`, `ARCHIVE_JWT_SOURCE_CLAIM` | Optional. Token claims naming the caller's tenant and the calling service (`tenant_id` and `azp` by default) |
@@ -149,6 +151,18 @@ publishes Micrometer metrics, tagged with `status` (`pending` or `deleting`), re
 
 A backlog that grows, or an oldest age far above the grace period, means the reconciliation is
 blocked or disabled.
+
+## Observability
+
+### Logs
+
+Outside the `local` profile, the logs are JSON lines in the Elastic Common Schema. Each operation of
+the document API writes one line once its answer is complete, downloads included, with in the MDC
+`operation` (`UPLOAD`, `DOWNLOAD`, `DELETE`, `READ`, `SEARCH`) and `documentId`, and as key-value
+pairs `status`, `outcome` (`success`, `client-error`, `server-error`), `durationMs`, `errorCode` (the
+`code` of the error answer) and, only when `ARCHIVE_LOG_TENANT` is `true`, `tenantId`. Requests
+refused by the security are logged too. The content, the token, the storage credentials, the file
+name and the business reference are never logged.
 
 ## Security
 

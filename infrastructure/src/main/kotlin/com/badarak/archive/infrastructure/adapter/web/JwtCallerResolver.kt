@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.support.WebDataBinderFactory
 import org.springframework.web.context.request.NativeWebRequest
+import org.springframework.web.context.request.RequestAttributes
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import org.springframework.web.method.support.ModelAndViewContainer
 
@@ -31,7 +32,9 @@ class JwtCallerResolver(private val claims: CallerClaimsProperties) : HandlerMet
     ): AuthenticatedCaller {
         val authentication = webRequest.userPrincipal as? JwtAuthenticationToken
             ?: throw IllegalStateException("The request reached a document endpoint without a JWT authentication")
-        return resolve(authentication.token)
+        return resolve(authentication.token).also {
+            webRequest.setAttribute(OperationLogFilter.TENANT, it.tenantId.value, RequestAttributes.SCOPE_REQUEST)
+        }
     }
 
     fun resolve(jwt: Jwt): AuthenticatedCaller = AuthenticatedCaller(

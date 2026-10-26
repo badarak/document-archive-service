@@ -13,6 +13,12 @@ spring:
           jwk-set-uri: https://auth.test/jwks
           audiences: document-archive-service
 
+# Readable logs in the test output instead of JSON lines.
+logging:
+  structured:
+    format:
+      console: ""
+
 # Placeholder storage settings: the S3 client is built but never contacts a server in tests.
 archive:
   # Journey tests run the reconciliation themselves, so it is never scheduled in tests.

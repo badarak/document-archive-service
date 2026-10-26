@@ -6,6 +6,12 @@ spring:
       - optional:file:.env[.properties]
       - optional:file:../.env[.properties]
 
+# Readable logs on the console instead of JSON lines.
+logging:
+  structured:
+    format:
+      console: ${ARCHIVE_LOG_FORMAT:}
+
 springdoc:
   open-api:
     components:

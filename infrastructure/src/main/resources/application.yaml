@@ -42,7 +42,17 @@ spring:
           # Signature algorithms accepted from the issuer; an unsigned token is always refused.
           jws-algorithms: ${ARCHIVE_JWT_ALGORITHMS:RS256}
 
+logging:
+  structured:
+    format:
+      # One JSON object per line (Elastic Common Schema), with the MDC and the key-value pairs of each log; empty for
+      # the readable format, as in the local profile.
+      console: ${ARCHIVE_LOG_FORMAT:ecs}
+
 archive:
+  # The log line of each API operation names the tenant of the caller only if the logging policy allows it.
+  logging:
+    include-tenant: ${ARCHIVE_LOG_TENANT:false}
   security:
     claims:
       tenant: ${ARCHIVE_JWT_TENANT_CLAIM:tenant_id}

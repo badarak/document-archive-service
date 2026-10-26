@@ -3,6 +3,9 @@ package com.badarak.archive.infrastructure.adapter.storage
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.port.outbound.MissingObjectException
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
+import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.micrometer.observation.ObservationRegistry
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -29,7 +32,11 @@ import java.net.URI
 class ObjectStorageAdapterTest {
 
     private val s3Client = mockk<S3Client>()
-    private val adapter = ObjectStorageAdapter(s3Client, properties())
+    private val meters = SimpleMeterRegistry()
+    private val observations = ObservationRegistry.create().apply {
+        observationConfig().observationHandler(DefaultMeterObservationHandler(meters))
+    }
+    private val adapter = ObjectStorageAdapter(s3Client, properties(), observations)
 
     private val key = ObjectKey("documents/7d7d57e1")
     private val content = "%PDF-1.7 content".toByteArray()
@@ -128,6 +135,24 @@ class ObjectStorageAdapterTest {
     }
 
     private fun store() = adapter.store(key, content.inputStream(), content.size.toLong(), "application/pdf")
+
+    @Test
+    fun `every storage call is timed by operation and outcome`() {
+        every { s3Client.putObject(any<PutObjectRequest>(), any<RequestBody>()) } returns PutObjectResponse.builder().build()
+        every { s3Client.getObject(any<GetObjectRequest>()) } throws NoSuchKeyException.builder().message("missing").build()
+        every { s3Client.deleteObject(any<DeleteObjectRequest>()) } throws SdkClientException.create("Connection refused")
+
+        store()
+        assertThrows(MissingObjectException::class.java) { adapter.open(key) }
+        assertThrows(ObjectStorageException::class.java) { adapter.delete(key) }
+
+        assertEquals(1, calls("store", "success"))
+        assertEquals(1, calls("open", "missing"))
+        assertEquals(1, calls("delete", "failure"))
+    }
+
+    private fun calls(operation: String, outcome: String): Long =
+        meters.find("archive.storage").tag("operation", operation).tag("outcome", outcome).timer()?.count() ?: 0
 
     private fun properties() = S3StorageProperties(
         endpoint = URI.create("http://localhost:9000"),

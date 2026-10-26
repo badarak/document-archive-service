@@ -171,6 +171,7 @@ Micrometer records, tagged with `application`:
 | Metric | Type | Tags |
 |---|---|---|
 | `archive.upload`, `archive.download`, `archive.delete`, `archive.read`, `archive.search` | Timer: count and duration of each API operation, downloads streamed to their end | `outcome` (`success`, `client-error`, `server-error`), `error.code` (`none` on success) |
+| `archive.storage` | Timer: count and duration of each call to the object storage, until the first bytes for a read | `operation` (`store`, `open`, `delete`), `outcome` (`success`, `missing`, `failure`) |
 | `archive.reconciliation.*` | See the reconciliation above | `status` |
 
 No identifier is ever a tag: the document and the tenant belong to the logs.

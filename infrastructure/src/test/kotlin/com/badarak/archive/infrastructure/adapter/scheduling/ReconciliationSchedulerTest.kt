@@ -1,5 +1,8 @@
 package com.badarak.archive.infrastructure.adapter.scheduling
 
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.StalledBacklog
 import com.badarak.archive.domain.port.inbound.AbandonStalledArchivingsUseCase
@@ -17,8 +20,10 @@ import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
+import org.slf4j.LoggerFactory
 import org.springframework.boot.test.system.CapturedOutput
 import org.springframework.boot.test.system.OutputCaptureExtension
 import java.time.Clock
@@ -76,6 +81,34 @@ class ReconciliationSchedulerTest {
     }
 
     @Test
+    fun `the lines carry the operation in the MDC, and the document, outcome and error code as key-value pairs`() {
+        val abandoned = DocumentId.generate()
+        val failed = DocumentId.generate()
+        every { resumeDeletions.resume() } returns outcome(
+            failures = listOf(ReconciliationFailure(failed, ObjectStorageException("Object locked", RuntimeException()))),
+        )
+        every { abandonArchivings.abandon() } returns outcome(completed = listOf(abandoned))
+        val lines = ListAppender<ILoggingEvent>().also { it.start() }
+        val logger = LoggerFactory.getLogger(ReconciliationScheduler::class.java) as Logger
+        logger.addAppender(lines)
+
+        try {
+            scheduler.run()
+        } finally {
+            logger.detachAppender(lines)
+        }
+
+        assertTrue(lines.list.all { it.mdcPropertyMap["operation"] == "RECONCILIATION" })
+        val failure = lines.list.single { it.value("outcome") == "failed" }
+        assertEquals(
+            mapOf("status" to "deleting", "documentId" to failed, "errorCode" to "storage-failure"),
+            failure.values("status", "documentId", "errorCode"),
+        )
+        val abandonment = lines.list.single { it.value("outcome") == "abandoned" }
+        assertEquals(mapOf("status" to "pending", "documentId" to abandoned), abandonment.values("status", "documentId"))
+    }
+
+    @Test
     fun `a failed deletion step does not prevent the archiving step, and the run is absorbed`() {
         every { resumeDeletions.resume() } throws DocumentPersistenceException("Database down", RuntimeException())
         every { abandonArchivings.abandon() } returns outcome()
@@ -127,6 +160,10 @@ class ReconciliationSchedulerTest {
 
     private fun counter(name: String, status: String, outcome: String): Double =
         registry.get(name).tag("status", status).tag("outcome", outcome).counter().count()
+
+    private fun ILoggingEvent.value(key: String): Any? = keyValuePairs.orEmpty().firstOrNull { it.key == key }?.value
+
+    private fun ILoggingEvent.values(vararg keys: String): Map<String, Any?> = keys.associateWith { value(it) }
 
     private fun outcome(
         completed: List<DocumentId> = emptyList(),

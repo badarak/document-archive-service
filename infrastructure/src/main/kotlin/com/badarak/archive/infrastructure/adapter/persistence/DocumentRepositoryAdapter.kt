@@ -11,12 +11,14 @@ import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.PageRequest
+import com.badarak.archive.domain.model.StalledBacklog
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import jakarta.persistence.criteria.Path
 import jakarta.persistence.criteria.Root
+import org.slf4j.LoggerFactory
 import org.springframework.dao.DataAccessException
 import org.springframework.data.domain.Limit
 import org.springframework.data.domain.Sort
@@ -29,10 +31,13 @@ import org.springframework.data.domain.PageRequest as SpringPageRequest
 /**
  * Each call runs in its own transaction, the one Spring Data opens around it. Documents are rebuilt through their
  * constructor, so a row breaking a current domain rule fails to load, as a persistence error rather than as an invalid
- * request.
+ * request. The stalled documents are the exception: such a row is logged and left out, so that it never holds back the
+ * reconciliation of the others.
  */
 @Repository
 class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocumentRepository) : DocumentRepository {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     override fun create(document: ArchivedDocument) {
         try {
@@ -63,9 +68,22 @@ class DocumentRepositoryAdapter(private val repository: SpringDataArchivedDocume
         }
 
     override fun findStalled(status: DocumentStatus, updatedBefore: Instant, limit: Int): List<ArchivedDocument> = try {
-        repository.findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(status.name, updatedBefore, Limit.of(limit)).map { it.toDomain() }
+        repository.findByStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(status.name, updatedBefore, Limit.of(limit)).mapNotNull(::toStalled)
     } catch (e: DataAccessException) {
         throw DocumentPersistenceException("Could not read the documents left $status", e)
+    }
+
+    override fun measureStalled(status: DocumentStatus, updatedBefore: Instant): StalledBacklog = try {
+        repository.measureStalled(status.name, updatedBefore).let { StalledBacklog(it.stalled, it.oldest) }
+    } catch (e: DataAccessException) {
+        throw DocumentPersistenceException("Could not measure the documents left $status", e)
+    }
+
+    private fun toStalled(row: ArchivedDocumentEntity): ArchivedDocument? = try {
+        row.toDomain()
+    } catch (e: DocumentPersistenceException) {
+        log.warn("{}, left out of the reconciliation: {}", e.message, e.cause?.message)
+        null
     }
 }
 

@@ -7,6 +7,11 @@ server:
 spring:
   application:
     name: document-archive-service
+  lifecycle:
+    # On shutdown, requests in progress are finished first. The wait exceeds the storage api-call-timeout, so that an
+    # upload is not cut and its archiving left pending. The orchestrator must give at least as long before killing the
+    # process (terminationGracePeriodSeconds on Kubernetes).
+    timeout-per-shutdown-phase: ${ARCHIVE_SHUTDOWN_TIMEOUT:150s}
   datasource:
     url: ${ARCHIVE_DB_URL}
     username: ${ARCHIVE_DB_USERNAME}

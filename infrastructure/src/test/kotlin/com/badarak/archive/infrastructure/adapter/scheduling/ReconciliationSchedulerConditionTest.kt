@@ -3,10 +3,13 @@ package com.badarak.archive.infrastructure.adapter.scheduling
 import com.badarak.archive.domain.port.inbound.AbandonStalledArchivingsUseCase
 import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.infrastructure.config.ReconciliationProperties
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import java.time.Clock
 
 class ReconciliationSchedulerConditionTest {
 
@@ -15,6 +18,8 @@ class ReconciliationSchedulerConditionTest {
         .withBean(ResumeDeletionsUseCase::class.java, { mockk<ResumeDeletionsUseCase>(relaxed = true) })
         .withBean(AbandonStalledArchivingsUseCase::class.java, { mockk<AbandonStalledArchivingsUseCase>(relaxed = true) })
         .withBean(ReconciliationProperties::class.java, { ReconciliationProperties() })
+        .withBean(MeterRegistry::class.java, { SimpleMeterRegistry() })
+        .withBean(Clock::class.java, { Clock.systemUTC() })
 
     @Test
     fun `the reconciliation is scheduled when the property is missing`() {

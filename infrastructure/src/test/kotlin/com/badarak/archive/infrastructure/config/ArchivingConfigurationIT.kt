@@ -3,10 +3,16 @@ package com.badarak.archive.infrastructure.config
 import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentSizePolicy
+import com.badarak.archive.domain.port.inbound.AbandonStalledArchivingsUseCase
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.domain.service.ArchiveDocumentService
+import com.badarak.archive.infrastructure.adapter.scheduling.ObservedAbandonStalledArchivings
+import com.badarak.archive.infrastructure.adapter.scheduling.ObservedResumeDeletions
+import io.micrometer.core.instrument.MeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -30,11 +36,30 @@ class ArchivingConfigurationIT {
     @Autowired
     private lateinit var formatPolicy: DocumentFormatPolicy
 
+    @Autowired
+    private lateinit var resumeDeletions: ResumeDeletionsUseCase
+
+    @Autowired
+    private lateinit var abandonArchivings: AbandonStalledArchivingsUseCase
+
+    @Autowired
+    private lateinit var meters: MeterRegistry
+
     @Test
     fun `spring builds the archiving service with a UTC clock and the 50 MiB size limit`() {
         assertInstanceOf(ArchiveDocumentService::class.java, useCase)
         assertEquals(ZoneOffset.UTC, clock.zone)
         assertEquals(50L * 1024 * 1024, sizePolicy.maxSizeBytes)
+    }
+
+    @Test
+    fun `the reconciliation use cases are logged and measured, into the meter registry of the application`() {
+        assertInstanceOf(ObservedResumeDeletions::class.java, resumeDeletions)
+        assertInstanceOf(ObservedAbandonStalledArchivings::class.java, abandonArchivings)
+
+        resumeDeletions.resume()
+
+        assertNotNull(meters.find("archive.reconciliation.runs").tag("status", "deleting").counter())
     }
 
     @Test

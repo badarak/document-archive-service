@@ -1,5 +1,7 @@
 package com.badarak.archive.infrastructure.adapter.storage
 
+import com.badarak.archive.domain.port.outbound.ObjectStorage
+import io.micrometer.observation.ObservationRegistry
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -26,4 +28,8 @@ class S3StorageConfiguration {
         .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
         .overrideConfiguration { it.apiCallTimeout(properties.apiCallTimeout) }
         .build()
+
+    @Bean
+    fun objectStorage(s3Client: S3Client, properties: S3StorageProperties, observations: ObservationRegistry): ObjectStorage =
+        ObservedObjectStorage(ObjectStorageAdapter(s3Client, properties), observations)
 }

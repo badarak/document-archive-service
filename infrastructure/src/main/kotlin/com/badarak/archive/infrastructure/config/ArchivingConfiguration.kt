@@ -19,6 +19,10 @@ import com.badarak.archive.domain.service.DownloadDocumentService
 import com.badarak.archive.domain.service.GetDocumentService
 import com.badarak.archive.domain.service.ResumeDeletionsService
 import com.badarak.archive.domain.service.SearchDocumentsService
+import com.badarak.archive.infrastructure.adapter.scheduling.ObservedAbandonStalledArchivings
+import com.badarak.archive.infrastructure.adapter.scheduling.ObservedResumeDeletions
+import com.badarak.archive.infrastructure.adapter.scheduling.ReconciliationMetrics
+import com.badarak.archive.infrastructure.adapter.scheduling.ReconciliationReport
 import com.badarak.archive.infrastructure.adapter.storage.S3StorageProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -69,20 +73,31 @@ class ArchivingConfiguration {
     }
 
     @Bean
+    fun reconciliationMetrics(clock: Clock): ReconciliationMetrics = ReconciliationMetrics(clock)
+
+    @Bean
+    fun reconciliationReport(metrics: ReconciliationMetrics): ReconciliationReport = ReconciliationReport(metrics)
+
+    /** The resumption of the deletions, logged and measured around the use case. */
+    @Bean
     fun resumeDeletionsUseCase(
         documents: DocumentRepository,
         storage: ObjectStorage,
         clock: Clock,
         policy: StalledDocumentsPolicy,
-    ): ResumeDeletionsUseCase = ResumeDeletionsService(documents, storage, clock, policy)
+        report: ReconciliationReport,
+    ): ResumeDeletionsUseCase = ObservedResumeDeletions(ResumeDeletionsService(documents, storage, clock, policy), report)
 
+    /** The abandonment of the archivings, logged and measured around the use case. */
     @Bean
     fun abandonStalledArchivingsUseCase(
         documents: DocumentRepository,
         storage: ObjectStorage,
         clock: Clock,
         policy: StalledDocumentsPolicy,
-    ): AbandonStalledArchivingsUseCase = AbandonStalledArchivingsService(documents, storage, clock, policy)
+        report: ReconciliationReport,
+    ): AbandonStalledArchivingsUseCase =
+        ObservedAbandonStalledArchivings(AbandonStalledArchivingsService(documents, storage, clock, policy), report)
 
     @Bean
     fun searchDocumentsUseCase(documents: DocumentRepository): SearchDocumentsUseCase = SearchDocumentsService(documents)

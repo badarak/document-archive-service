@@ -23,6 +23,7 @@ class SecurityConfiguration {
                 authorize(DispatcherTypeRequestMatcher(DispatcherType.ERROR), permitAll)
                 authorize("/actuator/health", permitAll)
                 authorize("/actuator/health/**", permitAll)
+                authorize(HttpMethod.GET, "/actuator/prometheus", hasAuthority(READ_METRICS))
                 authorize("/v3/api-docs", permitAll)
                 authorize("/v3/api-docs/**", permitAll)
                 authorize("/swagger-ui.html", permitAll)
@@ -52,5 +53,6 @@ class SecurityConfiguration {
         private const val READ_DOCUMENTS = "SCOPE_documents:read"
         private const val WRITE_DOCUMENTS = "SCOPE_documents:write"
         private const val DELETE_DOCUMENTS = "SCOPE_documents:delete"
+        private const val READ_METRICS = "SCOPE_metrics:read"
     }
 }

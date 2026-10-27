@@ -1,5 +1,7 @@
 package com.badarak.archive.infrastructure.security
 
+import com.badarak.archive.infrastructure.adapter.web.ApiOperationFilter
+import com.badarak.archive.infrastructure.adapter.web.withTraceId
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpStatus
@@ -38,9 +40,11 @@ class ProblemDetailsSecurityErrorHandler(private val jsonMapper: JsonMapper) :
     }
 
     private fun writeProblem(request: HttpServletRequest, response: HttpServletResponse, status: HttpStatus, code: String, detail: String) {
+        request.setAttribute(ApiOperationFilter.ERROR_CODE, code)
         val problem = ProblemDetail.forStatusAndDetail(status, detail).apply {
             instance = URI.create(request.requestURI)
             setProperty("code", code)
+            withTraceId()
         }
         response.contentType = MediaType.APPLICATION_PROBLEM_JSON_VALUE
         jsonMapper.writeValue(response.outputStream, problem)

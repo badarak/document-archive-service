@@ -4,7 +4,6 @@ import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.port.outbound.MissingObjectException
 import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
-import org.springframework.stereotype.Component
 import software.amazon.awssdk.core.exception.SdkException
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
@@ -17,9 +16,8 @@ import java.io.InputStream
 /**
  * Uploads each document in a single PutObject request: documents are small enough to need no multipart upload. Reads
  * stream the object from the storage, without loading it in memory. DeleteObject succeeds on a missing key with S3, MinIO
- * and Cloudflare R2, which makes deletions replayable.
+ * and Cloudflare R2, which makes deletions replayable. Its calls are measured by [ObservedObjectStorage], which wraps it.
  */
-@Component
 class ObjectStorageAdapter(private val s3Client: S3Client, private val properties: S3StorageProperties) : ObjectStorage {
 
     override fun store(key: ObjectKey, content: InputStream, sizeBytes: Long, contentType: String) {

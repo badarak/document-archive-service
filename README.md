@@ -20,9 +20,9 @@ Run every command from the project root.
 cp .env.example .env
 ```
 
-Then fill in the eight empty values in `.env`: the database username and password, the object
+Then fill in the nine empty values in `.env`: the database username and password, the object
 storage access key and secret key (at least 8 characters), the Keycloak admin username and password,
-and the secrets of the two calling services. Any value works locally; the same file configures both
+the secrets of the two calling services and the secret of the Prometheus scraper. Any value works locally; the same file configures both
 the containers and the application. `.env` is ignored by git.
 
 An existing `.env` must also get the `ARCHIVE_KEYCLOAK_*` variables of `.env.example`: Docker Compose
@@ -76,9 +76,15 @@ one is missing.
 | `ARCHIVE_S3_PORT`, `ARCHIVE_S3_CONSOLE_PORT` | Published ports of the MinIO container |
 | `ARCHIVE_KEYCLOAK_PORT`, `ARCHIVE_KEYCLOAK_ADMIN_USERNAME`, `ARCHIVE_KEYCLOAK_ADMIN_PASSWORD` | Published port and admin account of the Keycloak container |
 | `ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET`, `ARCHIVE_KEYCLOAK_GLOBEX_CLIENT_SECRET` | Secrets of the two calling services declared in the local realm |
+| `ARCHIVE_KEYCLOAK_PROMETHEUS_CLIENT_SECRET` | Secret of the `prometheus` client of the local realm, whose tokens carry only the `metrics:read` scope |
 | `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
+| `MANAGEMENT_SERVER_PORT` | Optional. Port of the actuator endpoints (health probes and Prometheus), the application port by default; a separate port keeps them off the public network |
+| `ARCHIVE_TRACING_SAMPLING` | Optional. Share of the requests whose trace is recorded, from `0` to `1` (`0.1` by default, `1.0` with the `local` profile) |
+| `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` | Optional. OTLP endpoint of the collector the recorded traces are sent to, such as `http://otel-collector:4318/v1/traces`; none by default |
+| `ARCHIVE_LOG_FORMAT` | Optional. Console log format: `ecs` (JSON lines, by default), `logstash`, `gelf`, or empty for the readable format of the `local` profile |
+| `ARCHIVE_LOG_TENANT` | Optional. Whether the log line of each API operation names the tenant of the caller (`false` by default) |
 | `ARCHIVE_SHUTDOWN_TIMEOUT` | Optional. Longest wait for the requests in progress on shutdown (`150s` by default). Keep it above `ARCHIVE_S3_API_CALL_TIMEOUT`, and give the orchestrator at least as long before it kills the process |
 | `ARCHIVE_JWT_ISSUER`, `ARCHIVE_JWT_JWKS_URI`, `ARCHIVE_JWT_AUDIENCE` | Access token validation, see [Security](#security) |
 | `ARCHIVE_JWT_TENANT_CLAIM`, `ARCHIVE_JWT_SOURCE_CLAIM` | Optional. Token claims naming the caller's tenant and the calling service (`tenant_id` and `azp` by default) |
@@ -150,6 +156,55 @@ publishes Micrometer metrics, tagged with `status` (`pending` or `deleting`), re
 A backlog that grows, or an oldest age far above the grace period, means the reconciliation is
 blocked or disabled.
 
+## Observability
+
+### Logs
+
+Outside the `local` profile, the logs are JSON lines in the Elastic Common Schema. Each operation of
+the document API writes one line once its answer is complete, downloads included, with in the MDC
+`operation` (`UPLOAD`, `DOWNLOAD`, `DELETE`, `READ`, `SEARCH`) and `documentId`, and as key-value
+pairs `status`, `outcome` (`success`, `client-error`, `server-error`), `durationMs`, `errorCode` (the
+`code` of the error answer) and, only when `ARCHIVE_LOG_TENANT` is `true`, `tenantId`. Requests
+refused by the security are logged too. The content, the token, the storage credentials, the file
+name and the business reference are never logged.
+
+### Metrics
+
+Micrometer records, tagged with `application`:
+
+| Metric | Type | Tags |
+|---|---|---|
+| `archive.upload`, `archive.download`, `archive.delete`, `archive.read`, `archive.search` | Timer: count and duration of each API operation, downloads streamed to their end | `outcome` (`success`, `client-error`, `server-error`), `error.code` (`none` on success) |
+| `archive.storage` | Timer: count and duration of each call to the object storage, until the first bytes for a read | `operation` (`store`, `open`, `delete`), `outcome` (`success`, `missing`, `failure`) |
+| `archive.reconciliation.*` | See the reconciliation above | `status` |
+
+No identifier is ever a tag: the document and the tenant belong to the logs.
+
+Prometheus scrapes them at `/actuator/prometheus`, with a token carrying the `metrics:read` scope
+(`authorization` in its scrape configuration). Set `MANAGEMENT_SERVER_PORT` to serve the actuator
+endpoints, the probes included, on a port of their own that the public network does not reach.
+
+Locally, the `prometheus` client of the Keycloak realm gets such a token:
+
+```bash
+source .env
+TOKEN=$(curl -s http://localhost:8180/realms/archive/protocol/openid-connect/token \
+  -d grant_type=client_credentials -d client_id=prometheus \
+  -d client_secret="$ARCHIVE_KEYCLOAK_PROMETHEUS_CLIENT_SECRET" | jq -r .access_token)
+
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/actuator/prometheus | grep '^archive_'
+```
+
+### Traces
+
+Every request gets a W3C trace, continued from the `traceparent` header of the caller when it sends
+one. Its `traceId` is in every log line of the request and in every error answer, so that a caller
+can report the exact request that failed. A share of the traces is recorded (`ARCHIVE_TRACING_SAMPLING`,
+10% by default, all of them with the `local` profile), with a span per API operation and per storage
+call, and sent to an OpenTelemetry collector once
+`MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` names one. The metrics are not pushed over
+OTLP: Prometheus scrapes them.
+
 ## Security
 
 The service is an OAuth2 resource server: callers authenticate with a JWT access token sent in the
@@ -158,6 +213,7 @@ The service is an OAuth2 resource server: callers authenticate with a JWT access
 | Request | Requirement |
 |---|---|
 | `/actuator/health` and its probes | None, so monitoring can call them |
+| `GET /actuator/prometheus` | Valid token with the `metrics:read` scope; the Prometheus scraping endpoint |
 | `/.well-known/oauth-protected-resource` | None; standard metadata published by Spring Security (the service URL and the bearer method) |
 | `/v3/api-docs` and `/swagger-ui/**` | None; the OpenAPI description of the API, when `ARCHIVE_OPENAPI_ENABLED` is true |
 | `GET /api/v1/documents/**` (read, search, download) | Valid token with the `documents:read` scope |

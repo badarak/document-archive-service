@@ -6,8 +6,10 @@ import com.badarak.archive.domain.port.inbound.ReconciliationOutcome
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.binder.MeterBinder
 import java.time.Clock
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -18,10 +20,31 @@ import java.util.concurrent.atomic.AtomicReference
  * - `archive.reconciliation.documents`: documents moved on (`outcome=completed`) or not (`outcome=failed`);
  * - `archive.reconciliation.runs`: runs over (`completed`), stopped after failures in a row (`interrupted`), or unable to
  * read the stalled documents (`failed`).
+ *
+ * The only component of the reconciliation that knows the meter registry, which Spring Boot hands to it. A status gets its
+ * gauges with its first run: while the reconciliation is disabled, they are missing rather than reporting an empty backlog.
  */
-internal class ReconciliationMetrics(private val registry: MeterRegistry, private val clock: Clock) {
+class ReconciliationMetrics(private val clock: Clock) : MeterBinder {
 
-    private val backlogs = RECONCILED.associateWith { status ->
+    private lateinit var registry: MeterRegistry
+    private val backlogs = ConcurrentHashMap<DocumentStatus, AtomicReference<StalledBacklog>>()
+
+    override fun bindTo(registry: MeterRegistry) {
+        this.registry = registry
+    }
+
+    fun record(status: DocumentStatus, outcome: ReconciliationOutcome) {
+        backlog(status).set(outcome.backlog)
+        documents(status, "completed").increment(outcome.completed.size.toDouble())
+        documents(status, "failed").increment(outcome.failures.size.toDouble())
+        runs(status, if (outcome.interrupted) "interrupted" else "completed").increment()
+    }
+
+    fun failed(status: DocumentStatus) {
+        runs(status, "failed").increment()
+    }
+
+    private fun backlog(status: DocumentStatus): AtomicReference<StalledBacklog> = backlogs.computeIfAbsent(status) {
         AtomicReference(StalledBacklog.EMPTY).also { backlog ->
             Gauge.builder("archive.reconciliation.backlog", backlog) { it.get().count.toDouble() }
                 .description("Documents still stalled after the last reconciliation run")
@@ -33,17 +56,6 @@ internal class ReconciliationMetrics(private val registry: MeterRegistry, privat
                 .tag(STATUS, tag(status))
                 .register(registry)
         }
-    }
-
-    fun record(status: DocumentStatus, outcome: ReconciliationOutcome) {
-        backlogs.getValue(status).set(outcome.backlog)
-        documents(status, "completed").increment(outcome.completed.size.toDouble())
-        documents(status, "failed").increment(outcome.failures.size.toDouble())
-        runs(status, if (outcome.interrupted) "interrupted" else "completed").increment()
-    }
-
-    fun failed(status: DocumentStatus) {
-        runs(status, "failed").increment()
     }
 
     private fun age(backlog: StalledBacklog): Double =
@@ -62,7 +74,6 @@ internal class ReconciliationMetrics(private val registry: MeterRegistry, privat
     private fun tag(status: DocumentStatus) = status.name.lowercase()
 
     private companion object {
-        val RECONCILED = listOf(DocumentStatus.PENDING, DocumentStatus.DELETING)
         const val STATUS = "status"
         const val OUTCOME = "outcome"
     }

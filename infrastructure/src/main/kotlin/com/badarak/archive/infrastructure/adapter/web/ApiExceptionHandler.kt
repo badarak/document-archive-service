@@ -24,13 +24,17 @@ import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.context.request.RequestAttributes
+import org.springframework.web.context.request.RequestContextHolder
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.multipart.MaxUploadSizeExceededException
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler
 
 /**
  * Answers every API error as a Problem Details document (RFC 9457). Errors raised by the archive carry a
- * stable `code` property, since several of them share the same HTTP status.
+ * stable `code` property, since several of them share the same HTTP status; the code is also left on the request, for
+ * the log line of the operation. Each answer also carries the `traceId` of the request, which its logs carry too, so
+ * that a caller can report the exact request that failed.
  */
 @RestControllerAdvice
 class ApiExceptionHandler : ResponseEntityExceptionHandler() {
@@ -75,7 +79,13 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         status: HttpStatusCode,
         request: WebRequest,
     ): ResponseEntity<Any>? = super.handleMaxUploadSizeExceededException(ex, headers, status, request)
-        ?.also { (it.body as? ProblemDetail)?.setProperty(CODE, DOCUMENT_TOO_LARGE) }
+        ?.also {
+            (it.body as? ProblemDetail)?.apply {
+                setProperty(CODE, DOCUMENT_TOO_LARGE)
+                withTraceId()
+            }
+            request.setAttribute(ApiOperationFilter.ERROR_CODE, DOCUMENT_TOO_LARGE, RequestAttributes.SCOPE_REQUEST)
+        }
 
     private fun unavailable(error: RuntimeException): ProblemDetail {
         log.error("Archive unavailable: {}", error.message, error)
@@ -87,8 +97,13 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error", "An unexpected error occurred")
     }
 
-    private fun problem(status: HttpStatus, code: String, detail: String?): ProblemDetail =
-        ProblemDetail.forStatusAndDetail(status, detail).apply { setProperty(CODE, code) }
+    private fun problem(status: HttpStatus, code: String, detail: String?): ProblemDetail {
+        RequestContextHolder.getRequestAttributes()?.setAttribute(ApiOperationFilter.ERROR_CODE, code, RequestAttributes.SCOPE_REQUEST)
+        return ProblemDetail.forStatusAndDetail(status, detail).apply {
+            setProperty(CODE, code)
+            withTraceId()
+        }
+    }
 
     companion object {
         private const val CODE = "code"

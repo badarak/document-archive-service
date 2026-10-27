@@ -6,6 +6,18 @@ spring:
       - optional:file:.env[.properties]
       - optional:file:../.env[.properties]
 
+# Readable logs on the console instead of JSON lines.
+logging:
+  structured:
+    format:
+      console: ${ARCHIVE_LOG_FORMAT:}
+
+# Every local request is traced.
+management:
+  tracing:
+    sampling:
+      probability: ${ARCHIVE_TRACING_SAMPLING:1.0}
+
 springdoc:
   open-api:
     components:

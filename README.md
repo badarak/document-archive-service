@@ -81,6 +81,8 @@ one is missing.
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
 | `MANAGEMENT_SERVER_PORT` | Optional. Port of the actuator endpoints (health probes and Prometheus), the application port by default; a separate port keeps them off the public network |
+| `ARCHIVE_OTLP_URL` | Optional. OTLP endpoint of the `observability` profile (`http://localhost:4318` by default) |
+| `ARCHIVE_GRAFANA_PORT`, `ARCHIVE_OTLP_PORT` | Optional. Ports of the Grafana container of the `observability` Compose profile (`3000` and `4318` by default) |
 | `ARCHIVE_TRACING_SAMPLING` | Optional. Share of the requests whose trace is recorded, from `0` to `1` (`0.1` by default, `1.0` with the `local` profile) |
 | `MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT` | Optional. OTLP endpoint of the collector the recorded traces are sent to, such as `http://otel-collector:4318/v1/traces`; none by default |
 | `ARCHIVE_LOG_FORMAT` | Optional. Console log format: `ecs` (JSON lines, by default), `logstash`, `gelf`, or empty for the readable format of the `local` profile |
@@ -194,6 +196,26 @@ TOKEN=$(curl -s http://localhost:8180/realms/archive/protocol/openid-connect/tok
 
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/actuator/prometheus | grep '^archive_'
 ```
+
+### Grafana, locally
+
+The `observability` Compose profile starts Grafana with Prometheus, Loki and Tempo (the
+`grafana/otel-lgtm` image), and the `observability` Spring profile makes the application push its
+metrics, logs and traces to it over OTLP:
+
+```bash
+docker compose --profile observability up -d
+mvn spring-boot:run -Dspring-boot.run.profiles=local,observability   # or both profiles in the IDE
+```
+
+Open <http://localhost:3000> (`admin` / `admin`): the **Document Archive Service** dashboard shows the
+API operations by outcome and error code, their duration, the download error rate, the storage calls,
+the stalled documents and the reconciliation runs, next to the operation logs and the warnings. A log
+line links to its trace in Tempo. The dashboard is `docker/grafana/dashboards/document-archive.json`,
+and its queries work as well on a Prometheus that scrapes `/actuator/prometheus`.
+
+Without the Spring profile nothing is pushed; with it, the application logs export errors while the
+Grafana container is down.
 
 ### Traces
 

@@ -20,9 +20,9 @@ class ContentInspectorAdapterTest {
             DocumentFormat.DOC to bytes(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0),
             DocumentFormat.DOCX to Samples.docx(),
             DocumentFormat.EML to Samples.eml(),
-            DocumentFormat.MP3 to ascii("ID3") + bytes(0x04, 0, 0, 0, 0, 0, 0x23, 0, 0),
-            DocumentFormat.WAV to ascii("RIFF") + bytes(0x24, 0x08, 0, 0) + ascii("WAVE"),
-            DocumentFormat.M4A to bytes(0, 0, 0, 0x20) + ascii("ftypM4A "),
+            DocumentFormat.MP3 to Samples.mp3(),
+            DocumentFormat.WAV to Samples.wav(),
+            DocumentFormat.M4A to Samples.m4a(),
         )
 
         files.forEach { (format, file) -> assertEquals(ContentInspection.Conforming, inspect(file, format), "$format") }
@@ -30,7 +30,7 @@ class ContentInspectorAdapterTest {
 
     @Test
     fun `recognises an mp3 file without ID3 tag from its frame header`() {
-        assertEquals(ContentInspection.Conforming, inspect(bytes(0xFF, 0xFB, 0x90, 0x64), DocumentFormat.MP3))
+        assertEquals(ContentInspection.Conforming, inspect(Samples.mp3(tagged = false), DocumentFormat.MP3))
     }
 
     @ParameterizedTest

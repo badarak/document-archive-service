@@ -96,6 +96,7 @@ one is missing.
 | `ARCHIVE_ALLOWED_EXTENSIONS` | Optional. Formats callers may archive, among `pdf`, `doc`, `docx`, `mp3`, `wav`, `m4a` and `eml` (all by default). An unknown extension stops the application at startup |
 | `ARCHIVE_MAX_FILE_SIZE` | Optional. Maximum size of an archived file, in bytes or with a unit such as `20MB` (`52428800`, 50 MiB, by default). Above 50 MiB, `SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE` and `SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE` must be raised too, or the application does not start |
 | `ARCHIVE_REJECT_MIME_MISMATCH` | Optional. Whether a declared content type that does not match the format of the file is rejected (`true` by default); when `false`, the media type of the format is stored instead. A content that does not match its extension is always rejected |
+| `SPRING_SERVLET_MULTIPART_LOCATION` | Optional. Directory of the temporary files the uploads are written to, before their validation and their upload; the temporary directory of the server by default. Point it to a directory only the application can read. Each file is removed once its request is answered |
 
 ## The `local` profile
 

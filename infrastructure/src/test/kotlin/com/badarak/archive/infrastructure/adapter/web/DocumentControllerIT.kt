@@ -108,7 +108,7 @@ class DocumentControllerIT {
         every { useCase.archive(any()) } answers {
             val command = firstArg<ArchiveDocumentCommand>()
             received = command
-            receivedBytes = command.file.content.readAllBytes()
+            receivedBytes = command.file.content.open().use { it.readAllBytes() }
             archived(command.metadata)
         }
     }

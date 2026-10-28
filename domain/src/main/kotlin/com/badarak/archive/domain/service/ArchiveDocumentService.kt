@@ -8,6 +8,7 @@ import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentOwner
 import com.badarak.archive.domain.model.DocumentSizePolicy
 import com.badarak.archive.domain.model.DocumentStatus
+import com.badarak.archive.domain.model.FileContent
 import com.badarak.archive.domain.model.FileName
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.StoredFile
@@ -17,7 +18,7 @@ import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.port.outbound.ObjectStorageException
-import java.io.InputStream
+import java.io.IOException
 import java.time.Clock
 
 /**
@@ -42,18 +43,17 @@ class ArchiveDocumentService(
     private val failure = ArchivingFailure(documents, storage, clock)
 
     override fun archive(command: ArchiveDocumentCommand): ArchivedDocument {
-        val content = command.file.content.buffered()
-        val pending = admit(command, content)
+        val pending = admit(command)
         documents.create(pending)
-        upload(pending, content)
+        upload(pending, command.file.content)
         return complete(pending)
     }
 
-    private fun admit(command: ArchiveDocumentCommand, content: InputStream): ArchivedDocument {
+    private fun admit(command: ArchiveDocumentCommand): ArchivedDocument {
         val file = command.file
         val fileName = FileName.of(file.fileName)
         sizePolicy.check(file.sizeBytes)
-        val mediaType = formatPolicy.check(fileName, file.contentType, readHeader(content))
+        val mediaType = formatPolicy.check(fileName, file.contentType, readHeader(file.content))
         return ArchivedDocument.create(
             id = DocumentId.generate(),
             owner = DocumentOwner(command.caller.tenantId, command.caller.source),
@@ -63,17 +63,15 @@ class ArchiveDocumentService(
         )
     }
 
-    private fun readHeader(content: InputStream): ByteArray {
-        content.mark(DocumentFormat.HEADER_LENGTH)
-        val header = content.readNBytes(DocumentFormat.HEADER_LENGTH)
-        content.reset()
-        return header
-    }
+    private fun readHeader(content: FileContent): ByteArray = content.open().use { it.readNBytes(DocumentFormat.HEADER_LENGTH) }
 
-    private fun upload(pending: ArchivedDocument, content: InputStream) {
+    private fun upload(pending: ArchivedDocument, content: FileContent) {
         try {
-            storage.store(pending.file.objectKey, content, pending.file.sizeBytes, pending.file.contentType)
+            content.open().use { storage.store(pending.file.objectKey, it, pending.file.sizeBytes, pending.file.contentType) }
         } catch (e: ObjectStorageException) {
+            recordFailure(pending, e)
+            throw e
+        } catch (e: IOException) {
             recordFailure(pending, e)
             throw e
         }

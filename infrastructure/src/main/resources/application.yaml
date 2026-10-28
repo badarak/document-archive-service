@@ -20,6 +20,11 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 51MB
+      # Every uploaded file is written to a temporary file, never held in memory, so that it can be read once for its
+      # validation and once for its upload. The temporary files are removed at the end of each request, whatever its
+      # outcome. They go to the temporary directory of the server unless SPRING_SERVLET_MULTIPART_LOCATION names a
+      # private one.
+      file-size-threshold: 0
   liquibase:
     # The archive schema is provisioned outside the application and must exist before startup:
     # Liquibase stores its tracking tables in it.

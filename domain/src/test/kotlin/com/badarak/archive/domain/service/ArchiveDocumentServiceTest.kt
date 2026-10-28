@@ -9,6 +9,7 @@ import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentTooLargeException
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.EmptyDocumentException
+import com.badarak.archive.domain.model.FileContent
 import com.badarak.archive.domain.model.InvalidDocumentException
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.TenantId
@@ -34,6 +35,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.time.Clock
 import java.time.Instant
@@ -94,6 +97,17 @@ class ArchiveDocumentServiceTest {
             assertTrue(document.file.objectKey.value.startsWith(ObjectKey.PREFIX))
             assertEquals(now, document.createdAt)
             assertEquals(now, document.updatedAt)
+        }
+
+        @Test
+        fun `reads the content once to check it and once to upload it, and closes both streams`() {
+            val opened = mutableListOf<TrackedStream>()
+
+            service.archive(command(file = FileContent { TrackedStream(content).also(opened::add) }))
+
+            assertEquals(2, opened.size)
+            assertTrue(opened.all { it.closed })
+            assertArrayEquals(content, uploaded)
         }
 
         @Test
@@ -174,6 +188,19 @@ class ArchiveDocumentServiceTest {
         }
 
         @Test
+        fun `a content that cannot be read again for the upload records the document as failed`() {
+            val unreadable = IOException("The upload was cleaned up")
+            var opened = 0
+            val file = FileContent { if (opened++ == 0) content.inputStream() else throw unreadable }
+
+            val exception = assertThrows(IOException::class.java) { service.archive(command(file = file)) }
+
+            assertSame(unreadable, exception)
+            assertEquals(listOf(DocumentStatus.PENDING, DocumentStatus.FAILED), saved.map { it.status })
+            verify(exactly = 0) { storage.store(any(), any(), any(), any()) }
+        }
+
+        @Test
         fun `a failed upload leaves the document pending when its content cannot be removed`() {
             val failedRemoval = ObjectStorageException("Storage still unavailable", RuntimeException("Connection refused"))
             every { storage.store(any(), any(), any(), any()) } throws storageFailure
@@ -243,10 +270,22 @@ class ArchiveDocumentServiceTest {
         }
     }
 
-    private fun command(fileName: String = "invoice-123.pdf", contentType: String = "application/pdf", content: ByteArray = this.content) =
-        ArchiveDocumentCommand(
-            caller = AuthenticatedCaller(TenantId("acme"), "billing-service"),
-            metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
-            file = UploadedFile(fileName, contentType, content.size.toLong(), content.inputStream()),
-        )
+    private fun command(
+        fileName: String = "invoice-123.pdf",
+        contentType: String = "application/pdf",
+        content: ByteArray = this.content,
+        file: FileContent = FileContent { content.inputStream() },
+    ) = ArchiveDocumentCommand(
+        caller = AuthenticatedCaller(TenantId("acme"), "billing-service"),
+        metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
+        file = UploadedFile(fileName, contentType, content.size.toLong(), file),
+    )
+
+    private class TrackedStream(content: ByteArray) : ByteArrayInputStream(content) {
+        var closed = false
+
+        override fun close() {
+            closed = true
+        }
+    }
 }

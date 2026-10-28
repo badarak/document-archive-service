@@ -2,7 +2,7 @@ package com.badarak.archive.domain.model
 
 /**
  * Business rule on the format of an archived document: its extension must name one of
- * [allowedFormats], and its content must really be a file of that format. The content type
+ * [allowedFormats], and its content must really be a well-formed file of that format. The content type
  * declared by the caller must match the format too, unless [rejectMimeMismatch] is off: a wrong
  * declaration is then replaced by the media type of the format. The content itself is never let
  * through when it does not match.
@@ -30,10 +30,15 @@ class DocumentFormatPolicy(allowedFormats: Set<DocumentFormat> = DocumentFormat.
      * format when a mismatching declaration is tolerated.
      *
      * @throws ContentMismatchException when the content is not a file of the format
+     * @throws MalformedDocumentException when the content is a file of the format, but a malformed one
      * @throws ContentTypeMismatchException when the declared content type does not match the format, and that is rejected
      */
     fun check(format: DocumentFormat, declaredContentType: String, inspection: ContentInspection): String {
-        if (inspection is ContentInspection.OtherFormat) throw ContentMismatchException(format, inspection.detectedMediaType)
+        when (inspection) {
+            is ContentInspection.OtherFormat -> throw ContentMismatchException(format, inspection.detectedMediaType)
+            is ContentInspection.Malformed -> throw MalformedDocumentException(format, inspection.reason)
+            ContentInspection.Conforming -> Unit
+        }
         val mediaType = declaredContentType.substringBefore(';').trim().lowercase()
         return when {
             mediaType in format.contentTypes -> mediaType

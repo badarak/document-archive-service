@@ -14,17 +14,18 @@ class ContentInspectorAdapterTest {
     private val inspector = ContentInspectorAdapter()
 
     @Test
-    fun `recognises each format from the first bytes of a real file`() {
-        val headers = mapOf(
-            DocumentFormat.PDF to ascii("%PDF-1.7\n%"),
+    fun `accepts a well-formed file of each format`() {
+        val files = mapOf(
+            DocumentFormat.PDF to Samples.pdf(),
             DocumentFormat.DOC to bytes(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0),
-            DocumentFormat.DOCX to bytes(0x50, 0x4B, 0x03, 0x04, 0x14, 0, 0x06, 0, 0x08, 0, 0, 0),
+            DocumentFormat.DOCX to Samples.docx(),
+            DocumentFormat.EML to Samples.eml(),
             DocumentFormat.MP3 to ascii("ID3") + bytes(0x04, 0, 0, 0, 0, 0, 0x23, 0, 0),
             DocumentFormat.WAV to ascii("RIFF") + bytes(0x24, 0x08, 0, 0) + ascii("WAVE"),
             DocumentFormat.M4A to bytes(0, 0, 0, 0x20) + ascii("ftypM4A "),
         )
 
-        headers.forEach { (format, header) -> assertEquals(ContentInspection.Conforming, inspect(header, format), "$format") }
+        files.forEach { (format, file) -> assertEquals(ContentInspection.Conforming, inspect(file, format), "$format") }
     }
 
     @Test
@@ -73,7 +74,21 @@ class ContentInspectorAdapterTest {
     }
 
     @Test
-    fun `reads only the first bytes of the content`() {
+    fun `reports why a file of the format is malformed`() {
+        assertEquals(ContentInspection.Malformed("it contains macros"), inspect(Samples.docx("word/vbaProject.bin"), DocumentFormat.DOCX))
+        assertEquals(ContentInspection.Malformed("it has no end-of-file marker"), inspect(ascii("%PDF-1.7\n"), DocumentFormat.PDF))
+        assertEquals(ContentInspection.Malformed("it is not text"), inspect(ascii("From: a@b.c\n\u0000"), DocumentFormat.EML))
+    }
+
+    @Test
+    fun `a ZIP file that is not a Word document is not taken for one`() {
+        val application = Samples.zip("META-INF/MANIFEST.MF", "App.class")
+
+        assertEquals(ContentInspection.Malformed("it is a ZIP file, but not a Word document"), inspect(application, DocumentFormat.DOCX))
+    }
+
+    @Test
+    fun `reads only the first bytes of a content whose signature does not match`() {
         var read = 0
         val content = FileContent {
             object : InputStream() {
@@ -81,7 +96,7 @@ class ContentInspectorAdapterTest {
             }
         }
 
-        inspector.inspect(content, 1_000_000, DocumentFormat.EML)
+        inspector.inspect(content, 1_000_000, DocumentFormat.WAV)
 
         assertEquals(ContentInspectorAdapter.HEADER_LENGTH, read)
     }

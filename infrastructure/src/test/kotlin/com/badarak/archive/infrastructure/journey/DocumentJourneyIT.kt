@@ -422,7 +422,7 @@ class DocumentJourneyIT {
         private const val BILLING = "billing-service"
         private const val SALES = "sales-service"
         private val START: Instant = Instant.parse("2026-10-15T09:00:00Z")
-        private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + Random(42).nextBytes(1024 * 1024)
+        private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + Random(42).nextBytes(1024 * 1024) + "\n%%EOF\n".toByteArray()
         private val PROGRAM: ByteArray = "MZ".toByteArray() + Random(7).nextBytes(4096)
 
         @JvmStatic

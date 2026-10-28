@@ -124,7 +124,7 @@ class UploadTemporaryFilesIT {
     companion object {
         private const val DOCUMENTS = "/api/v1/documents"
         private const val WRITE = "documents:write"
-        private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + ByteArray(64)
+        private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + ByteArray(64) + "\n%%EOF\n".toByteArray()
         private val EXECUTABLE: ByteArray = "MZ".toByteArray() + ByteArray(64)
         private val uploads: Path = Files.createTempDirectory("archive-uploads")
 

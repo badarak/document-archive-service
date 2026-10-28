@@ -38,6 +38,7 @@ interface DocumentApi {
     @ApiResponse(responseCode = "403", description = "Token without the documents:write scope, or without tenant or source claim")
     @ApiResponse(responseCode = "413", description = "File larger than 50 MiB")
     @ApiResponse(responseCode = "415", description = "Format not allowed, or declared type or content not matching the extension")
+    @ApiResponse(responseCode = "422", description = "File of the announced format, but malformed or holding macros")
     @ApiResponse(responseCode = "503", description = "Object storage or document store unavailable")
     fun archive(
         @Parameter(description = "The file to archive, with its original name and content type")

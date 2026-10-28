@@ -17,6 +17,7 @@ import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.EmptyDocumentException
 import com.badarak.archive.domain.model.InvalidDocumentException
 import com.badarak.archive.domain.model.InvalidStatusTransitionException
+import com.badarak.archive.domain.model.MalformedDocumentException
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.PageRequest
 import com.badarak.archive.domain.model.StoredFile
@@ -670,6 +671,7 @@ class DocumentControllerIT {
             Arguments.of(UnsupportedDocumentFormatException("setup.exe", listOf("pdf")), 415, "unsupported-format"),
             Arguments.of(ContentTypeMismatchException("text/plain", DocumentFormat.PDF), 415, "content-type-mismatch"),
             Arguments.of(ContentMismatchException(DocumentFormat.PDF), 415, "content-mismatch"),
+            Arguments.of(MalformedDocumentException(DocumentFormat.DOCX, "it contains macros"), 422, "malformed-document"),
             Arguments.of(ObjectStorageException("Storage down", RuntimeException()), 503, "archive-unavailable"),
             Arguments.of(DocumentPersistenceException("Database down", RuntimeException()), 503, "archive-unavailable"),
             Arguments.of(ArchivingAbandonedException(DocumentId.generate()), 503, "archive-unavailable"),

@@ -99,6 +99,16 @@ class DocumentFormatPolicyTest {
     }
 
     @Test
+    fun `rejects a malformed file of the format, saying how it is malformed`() {
+        val exception = assertThrows(MalformedDocumentException::class.java) {
+            policy.check(DocumentFormat.DOCX, "application/zip", ContentInspection.Malformed("it contains macros"))
+        }
+
+        assertEquals(DocumentFormat.DOCX, exception.format)
+        assertEquals("The .docx file is malformed: it contains macros", exception.message)
+    }
+
+    @Test
     fun `never lets through content of another format, even when a mismatching declaration is tolerated`() {
         val tolerant = DocumentFormatPolicy(rejectMimeMismatch = false)
 

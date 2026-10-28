@@ -1,0 +1,24 @@
+# Local observability: pushes the metrics, traces and logs over OTLP to the Grafana stack of the observability Compose
+# profile (docker compose --profile observability up). Run it next to the local profile: local,observability.
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${ARCHIVE_OTLP_URL:http://localhost:4318}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: ${ARCHIVE_OTLP_URL:http://localhost:4318}/v1/logs
+  otlp:
+    metrics:
+      export:
+        enabled: true
+        url: ${ARCHIVE_OTLP_URL:http://localhost:4318}/v1/metrics
+        # Short enough for the charts to follow what is being tried.
+        step: 10s
+        # Timers in seconds, as Prometheus scrapes them: the same queries work on both (archive_upload_seconds_count).
+        base-time-unit: seconds

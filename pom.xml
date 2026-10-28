@@ -30,6 +30,8 @@
         <mockk.version>1.14.11</mockk.version>
         <aws-sdk.version>2.55.15</aws-sdk.version>
         <springdoc.version>3.1.1</springdoc.version>
+        <!-- Not managed by the Spring Boot BOM: keep it on the OpenTelemetry version of the BOM (opentelemetry.version). -->
+        <opentelemetry-logback-appender.version>2.28.1-alpha</opentelemetry-logback-appender.version>
         <ktlint-maven-plugin.version>3.7.1</ktlint-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <jacoco.minimum-line-coverage>0.80</jacoco.minimum-line-coverage>
@@ -60,6 +62,11 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
                 <version>${springdoc.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.opentelemetry.instrumentation</groupId>
+                <artifactId>opentelemetry-logback-appender-1.0</artifactId>
+                <version>${opentelemetry-logback-appender.version}</version>
             </dependency>
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>

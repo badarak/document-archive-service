@@ -44,6 +44,19 @@ services:
     volumes:
       - ./docker/keycloak:/opt/keycloak/data/import:ro
 
+  # Local observability, started only with "docker compose --profile observability up": Grafana with Prometheus, Loki
+  # and Tempo, which receive the metrics, logs and traces the application pushes over OTLP with its observability
+  # profile. Grafana is on http://localhost:3000, with the dashboard of docker/grafana already loaded.
+  grafana:
+    image: grafana/otel-lgtm:0.36.0
+    profiles: [observability]
+    ports:
+      - "${ARCHIVE_GRAFANA_PORT:-3000}:3000"
+      - "${ARCHIVE_OTLP_PORT:-4318}:4318"
+    volumes:
+      - ./docker/grafana/provisioning.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/document-archive.yaml:ro
+      - ./docker/grafana/dashboards:/otel-lgtm/document-archive-dashboards:ro
+
 volumes:
   pgdata:
   miniodata:

@@ -2,6 +2,9 @@ package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.ArchivingAbandonedException
+import com.badarak.archive.domain.model.ContentInspection
+import com.badarak.archive.domain.model.ContentMismatchException
+import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentSizePolicy
@@ -9,12 +12,15 @@ import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentTooLargeException
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.EmptyDocumentException
+import com.badarak.archive.domain.model.FileContent
+import com.badarak.archive.domain.model.InvalidDocumentException
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.AuthenticatedCaller
 import com.badarak.archive.domain.port.inbound.UploadedFile
+import com.badarak.archive.domain.port.outbound.ContentInspector
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
@@ -33,6 +39,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.time.Clock
 import java.time.Instant
@@ -45,10 +53,12 @@ class ArchiveDocumentServiceTest {
 
     private val documents = mockk<DocumentRepository>()
     private val storage = mockk<ObjectStorage>()
+    private val inspector = mockk<ContentInspector>()
     private val service = ArchiveDocumentService(
         documents = documents,
         storage = storage,
         formatPolicy = DocumentFormatPolicy(),
+        inspector = inspector,
         sizePolicy = DocumentSizePolicy(maxSizeBytes = 1_000),
         clock = Clock.fixed(now, ZoneOffset.UTC),
     )
@@ -62,6 +72,10 @@ class ArchiveDocumentServiceTest {
         every { documents.transition(capture(saved), any()) } returns true
         every { storage.store(any(), any(), any(), any()) } answers { uploaded = secondArg<InputStream>().readAllBytes() }
         every { storage.delete(any()) } just Runs
+        every { inspector.inspect(any(), any(), any()) } answers {
+            firstArg<FileContent>().open().use { it.read() }
+            ContentInspection.Conforming
+        }
     }
 
     @Nested
@@ -96,8 +110,19 @@ class ArchiveDocumentServiceTest {
         }
 
         @Test
+        fun `reads the content once to check it and once to upload it, and closes both streams`() {
+            val opened = mutableListOf<TrackedStream>()
+
+            service.archive(command(file = FileContent { TrackedStream(content).also(opened::add) }))
+
+            assertEquals(2, opened.size)
+            assertTrue(opened.all { it.closed })
+            assertArrayEquals(content, uploaded)
+        }
+
+        @Test
         fun `stores the normalised file name and media type`() {
-            val document = service.archive(command(fileName = "C:\\docs\\invoice.pdf", contentType = "Application/PDF; charset=binary"))
+            val document = service.archive(command(fileName = " invoice.pdf ", contentType = "Application/PDF; charset=binary"))
 
             assertEquals("invoice.pdf", document.file.fileName)
             assertEquals("application/pdf", document.file.contentType)
@@ -110,6 +135,37 @@ class ArchiveDocumentServiceTest {
         @Test
         fun `an unsupported format leaves no trace`() {
             assertThrows(UnsupportedDocumentFormatException::class.java) { service.archive(command(fileName = "setup.exe")) }
+
+            assertNothingWritten()
+        }
+
+        @Test
+        fun `the content is inspected as a file of the format its extension announces`() {
+            service.archive(command(fileName = "call.wav", contentType = "audio/wav"))
+
+            verify { inspector.inspect(any(), content.size.toLong(), DocumentFormat.WAV) }
+        }
+
+        @Test
+        fun `a content of another format leaves no trace`() {
+            every { inspector.inspect(any(), any(), any()) } returns ContentInspection.OtherFormat("application/x-executable")
+
+            val exception = assertThrows(ContentMismatchException::class.java) { service.archive(command()) }
+
+            assertEquals("The content does not match a .pdf file: it is application/x-executable", exception.message)
+            assertNothingWritten()
+        }
+
+        @Test
+        fun `an unsupported format is refused before its content is inspected`() {
+            assertThrows(UnsupportedDocumentFormatException::class.java) { service.archive(command(fileName = "setup.exe")) }
+
+            verify(exactly = 0) { inspector.inspect(any(), any(), any()) }
+        }
+
+        @Test
+        fun `a file name holding a path leaves no trace`() {
+            assertThrows(InvalidDocumentException::class.java) { service.archive(command(fileName = "C:\\docs\\invoice.pdf")) }
 
             assertNothingWritten()
         }
@@ -163,6 +219,19 @@ class ArchiveDocumentServiceTest {
                 storage.delete(saved.first().file.objectKey)
                 documents.transition(match { it.status == DocumentStatus.FAILED }, DocumentStatus.PENDING)
             }
+        }
+
+        @Test
+        fun `a content that cannot be read again for the upload records the document as failed`() {
+            val unreadable = IOException("The upload was cleaned up")
+            var opened = 0
+            val file = FileContent { if (opened++ == 0) content.inputStream() else throw unreadable }
+
+            val exception = assertThrows(IOException::class.java) { service.archive(command(file = file)) }
+
+            assertSame(unreadable, exception)
+            assertEquals(listOf(DocumentStatus.PENDING, DocumentStatus.FAILED), saved.map { it.status })
+            verify(exactly = 0) { storage.store(any(), any(), any(), any()) }
         }
 
         @Test
@@ -235,10 +304,22 @@ class ArchiveDocumentServiceTest {
         }
     }
 
-    private fun command(fileName: String = "invoice-123.pdf", contentType: String = "application/pdf", content: ByteArray = this.content) =
-        ArchiveDocumentCommand(
-            caller = AuthenticatedCaller(TenantId("acme"), "billing-service"),
-            metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
-            file = UploadedFile(fileName, contentType, content.size.toLong(), content.inputStream()),
-        )
+    private fun command(
+        fileName: String = "invoice-123.pdf",
+        contentType: String = "application/pdf",
+        content: ByteArray = this.content,
+        file: FileContent = FileContent { content.inputStream() },
+    ) = ArchiveDocumentCommand(
+        caller = AuthenticatedCaller(TenantId("acme"), "billing-service"),
+        metadata = DocumentMetadata(DocumentType("INVOICE"), "INV-2026-000123", "Customer invoice", mapOf("customerId" to "CUST-456")),
+        file = UploadedFile(fileName, contentType, content.size.toLong(), file),
+    )
+
+    private class TrackedStream(content: ByteArray) : ByteArrayInputStream(content) {
+        var closed = false
+
+        override fun close() {
+            closed = true
+        }
+    }
 }

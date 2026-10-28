@@ -1,6 +1,7 @@
 package com.badarak.archive.infrastructure.adapter.web
 
 import com.badarak.archive.domain.model.DocumentId
+import com.badarak.archive.domain.model.FileContent
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
 import com.badarak.archive.domain.port.inbound.AuthenticatedCaller
@@ -48,15 +49,8 @@ class DocumentController(
         caller: AuthenticatedCaller,
     ): ResponseEntity<ArchivedDocumentResponse> {
         val documentMetadata = metadata.toDomain()
-        val document = file.inputStream.use { content ->
-            archiveDocument.archive(
-                ArchiveDocumentCommand(
-                    caller = caller,
-                    metadata = documentMetadata,
-                    file = UploadedFile(file.originalFilename.orEmpty(), file.contentType.orEmpty(), file.size, content),
-                ),
-            )
-        }
+        val upload = UploadedFile(file.originalFilename.orEmpty(), file.contentType.orEmpty(), file.size, FileContent { file.inputStream })
+        val document = archiveDocument.archive(ArchiveDocumentCommand(caller = caller, metadata = documentMetadata, file = upload))
         val location = ServletUriComponentsBuilder.fromCurrentRequestUri().path("/{id}").buildAndExpand(document.id).toUri()
         return ResponseEntity.created(location).body(ArchivedDocumentResponse.from(document))
     }

@@ -15,19 +15,43 @@ class FileNameTest {
     }
 
     @ParameterizedTest
-    @CsvSource(
-        "/home/alice/invoice.pdf, invoice.pdf",
-        "'C:\\Users\\alice\\invoice.pdf', invoice.pdf",
-        "../../etc/passwd, passwd",
-        "'docs/2026\\invoice.pdf', invoice.pdf",
+    @ValueSource(
+        strings = [
+            "/home/alice/invoice.pdf", "C:\\Users\\alice\\invoice.pdf", "C:\\fakepath\\invoice.pdf", "../../etc/passwd",
+            "docs/2026\\invoice.pdf", "invoice.pdf/", ".", "..", "/", "docs/", "C:\\docs\\",
+        ],
     )
-    fun `drops the path sent by the client`(raw: String, expected: String) {
-        assertEquals(expected, FileName.of(raw).value)
+    fun `rejects a name that holds a path`(raw: String) {
+        val exception = assertThrows(InvalidDocumentException::class.java) { FileName.of(raw) }
+
+        assertEquals("fileName", exception.field)
+        assertEquals("Invalid document fileName: must not contain a path", exception.message)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["inv\u0000oice.pdf", "invoice\r\n.pdf", "invoice\t.pdf", "invoice\u007F.pdf", "invoice\u0085.pdf"])
+    fun `rejects a name that holds a control character`(raw: String) {
+        val exception = assertThrows(InvalidDocumentException::class.java) { FileName.of(raw) }
+
+        assertEquals("Invalid document fileName: must not contain control or invisible formatting characters", exception.message)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["invoice\u202Efdp.exe", "invoice\u202D.pdf", "in\u200Bvoice.pdf", "invoice\u2066.pdf", "\uFEFFinvoice.pdf"])
+    fun `rejects a name that holds an invisible formatting character, such as a right-to-left override`(raw: String) {
+        val exception = assertThrows(InvalidDocumentException::class.java) { FileName.of(raw) }
+
+        assertEquals("fileName", exception.field)
     }
 
     @Test
-    fun `trims surrounding spaces and removes control characters`() {
-        assertEquals("invoice.pdf", FileName.of("  inv\u0000oice\r\n.pdf\t ").value)
+    fun `trims surrounding spaces`() {
+        assertEquals("invoice.pdf", FileName.of("  invoice.pdf ").value)
+    }
+
+    @Test
+    fun `keeps dots, spaces and accents inside the name`() {
+        assertEquals("Facture n\u00B0 12 - \u00E9t\u00E9..v2.pdf", FileName.of("Facture n\u00B0 12 - \u00E9t\u00E9..v2.pdf").value)
     }
 
     @Test
@@ -38,7 +62,7 @@ class FileNameTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["", "   ", ".", "..", "/", "docs/", "C:\\docs\\", "\u0000\u0001"])
+    @ValueSource(strings = ["", "   "])
     fun `rejects a name that holds no file name`(raw: String) {
         val exception = assertThrows(InvalidDocumentException::class.java) { FileName.of(raw) }
 
@@ -57,13 +81,6 @@ class FileNameTest {
         val exception = assertThrows(InvalidDocumentException::class.java) { FileName.of("a".repeat(FileName.MAX_LENGTH + 1)) }
 
         assertEquals("fileName", exception.field)
-    }
-
-    @Test
-    fun `measures the length after the path is dropped`() {
-        val name = "a".repeat(FileName.MAX_LENGTH)
-
-        assertEquals(name, FileName.of("/some/very/long/directory/$name").value)
     }
 
     @ParameterizedTest

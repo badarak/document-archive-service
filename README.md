@@ -93,7 +93,10 @@ one is missing.
 | `ARCHIVE_JWT_ALGORITHMS` | Optional. Signature algorithms accepted from the issuer (`RS256` by default) |
 | `ARCHIVE_OPENAPI_ENABLED` | Optional. Publishes the OpenAPI description and the Swagger UI (`true` with the `local` profile, `false` otherwise) |
 | `ARCHIVE_RECONCILIATION_ENABLED`, `ARCHIVE_RECONCILIATION_INTERVAL`, `ARCHIVE_RECONCILIATION_GRACE_PERIOD`, `ARCHIVE_RECONCILIATION_BATCH_SIZE` | Optional. Resumption of the interrupted deletions and abandonment of the interrupted archivings, see [API](#api) (`true`, `5m`, `15m` and `100` by default) |
-| `ARCHIVE_ALLOWED_EXTENSIONS` | Optional. Formats callers may archive, among `pdf`, `doc`, `docx`, `mp3`, `wav`, `m4a` and `eml` (all by default). An unknown extension stops the application at startup |
+| `ARCHIVE_ALLOWED_EXTENSIONS` | Optional. Formats callers may archive, among `pdf`, `doc`, `docx`, `mp3`, `wav`, `m4a`, `ogg` and `eml` (all by default). An unknown extension stops the application at startup |
+| `ARCHIVE_MAX_FILE_SIZE` | Optional. Maximum size of an archived file, in bytes or with a unit such as `20MB` (`52428800`, 50 MiB, by default). Above 50 MiB, `SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE` and `SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE` must be raised too, or the application does not start |
+| `ARCHIVE_REJECT_MIME_MISMATCH` | Optional. Whether a declared content type that does not match the format of the file is rejected (`true` by default); when `false`, the media type of the format is stored instead. A content that does not match its extension is always rejected |
+| `SPRING_SERVLET_MULTIPART_LOCATION` | Optional. Directory of the temporary files the uploads are written to, before their validation and their upload; the temporary directory of the server by default. Point it to a directory only the application can read. Each file is removed once its request is answered |
 
 ## The `local` profile
 
@@ -123,6 +126,33 @@ curl -X POST http://localhost:8080/api/v1/documents \
 The answer is `201 Created`, with the document's `Location` and metadata. Errors are Problem Details
 documents (RFC 9457) with a `code` property, such as `unsupported-format` or `document-too-large`;
 the OpenAPI description lists them per status.
+
+Before anything is recorded or uploaded, the file is validated; a refused file leaves no trace and
+never becomes `AVAILABLE`:
+
+| Check | Refusal |
+|---|---|
+| Not empty, and not above `ARCHIVE_MAX_FILE_SIZE` (50 MiB by default) | `400 empty-document`, `413 document-too-large` |
+| A file name without path (`/`, `\`, `..`), control character nor invisible formatting character (such as a right-to-left override) | `400 invalid-document` |
+| An extension among `ARCHIVE_ALLOWED_EXTENSIONS` | `415 unsupported-format` |
+| A declared content type matching the extension (or replaced by the media type of the format, with `ARCHIVE_REJECT_MIME_MISMATCH=false`) | `415 content-type-mismatch` |
+| A content of the format the extension announces, read from its first bytes; a program (Windows, Linux, macOS, script) is never accepted, whatever its name | `415 content-mismatch` |
+| A well-formed file of that format (below) | `422 malformed-document` |
+
+| Format | Structure checked |
+|---|---|
+| PDF | An end-of-file marker in the last kilobyte |
+| DOC | An OLE2 compound file holding a `WordDocument` stream, without `Macros` storage |
+| DOCX | A ZIP package listing `[Content_Types].xml` and `word/document.xml`, without VBA project (macros) |
+| MP3 | Two consecutive valid MPEG audio frames, shortly after the optional ID3 tag |
+| WAV | A RIFF file whose format chunk (encoding, channels, sample rate) comes before its audio data |
+| M4A | An MPEG-4 file type box naming an audio or generic MPEG-4 brand |
+| OGG | A first page opening a Vorbis, Opus, FLAC or Speex stream |
+| EML | Text starting with RFC 5322 header fields, among them `From` or `Date`, in its first 64 KiB |
+
+Only bounded parts of the file are read for these checks, from the temporary file of the upload:
+nothing is decompressed nor loaded whole into memory. They tell what a file is, not that it is
+harmless: a well-formed PDF may still carry malicious content.
 
 A deletion first records the document as `DELETING`, which hides it, then removes its content from
 the storage and records it as `DELETED`. When the storage fails in between, the answer is `503` and

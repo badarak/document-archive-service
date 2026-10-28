@@ -5,12 +5,15 @@ import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.infrastructure.adapter.persistence.SpringDataArchivedDocumentRepository
 import com.badarak.archive.infrastructure.security.TestAuthorizationServer
 import com.jayway.jsonpath.JsonPath
+import org.hamcrest.Matchers.endsWith
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -100,6 +103,27 @@ class DocumentJourneyIT {
             }.andReturn().response
 
             assertArrayEquals(PDF, response.contentAsByteArray)
+        }
+    }
+
+    @Nested
+    inner class Refusing {
+
+        @ParameterizedTest
+        @CsvSource(
+            "invoice.pdf, application/pdf",
+            "message.eml, message/rfc822",
+            "report.docx, application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        fun `a program renamed as a document is refused and leaves no trace`(fileName: String, contentType: String) {
+            upload(file = MockMultipartFile("file", fileName, contentType, PROGRAM)).andExpect {
+                status { isUnsupportedMediaType() }
+                jsonPath("$.code") { value("content-mismatch") }
+                jsonPath("$.detail") { value(endsWith("it is application/vnd.microsoft.portable-executable")) }
+            }
+
+            assertEquals(0, rows.count())
+            assertTrue(storage.keys().isEmpty())
         }
     }
 
@@ -360,10 +384,11 @@ class DocumentJourneyIT {
         documentType: String = "INVOICE",
         businessReference: String? = null,
         source: String = BILLING,
+        file: MockMultipartFile = MockMultipartFile("file", "invoice.pdf", "application/pdf", PDF),
     ): ResultActionsDsl {
         val metadata = """{"documentType": "$documentType"${businessReference?.let { """, "businessReference": "$it"""" } ?: ""}}"""
         return mockMvc.multipart(DOCUMENTS) {
-            file(MockMultipartFile("file", "invoice.pdf", "application/pdf", PDF))
+            file(file)
             file(MockMultipartFile("metadata", "", "application/json", metadata.toByteArray()))
             header(HttpHeaders.AUTHORIZATION, "Bearer ${token(tenant, WRITE, source)}")
         }
@@ -397,7 +422,8 @@ class DocumentJourneyIT {
         private const val BILLING = "billing-service"
         private const val SALES = "sales-service"
         private val START: Instant = Instant.parse("2026-10-15T09:00:00Z")
-        private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + Random(42).nextBytes(1024 * 1024)
+        private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + Random(42).nextBytes(1024 * 1024) + "\n%%EOF\n".toByteArray()
+        private val PROGRAM: ByteArray = "MZ".toByteArray() + Random(7).nextBytes(4096)
 
         @JvmStatic
         @DynamicPropertySource

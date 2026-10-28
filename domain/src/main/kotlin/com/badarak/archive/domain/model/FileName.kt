@@ -6,8 +6,10 @@ import java.text.Normalizer
  * Original name of a document, as shown back to callers. It is informative only: the object
  * storage key never derives from it.
  *
- * [of] normalises the name sent by the client: any directory path is dropped, the text is put in
- * Unicode NFC form, control characters are removed and surrounding spaces are trimmed.
+ * [of] refuses a name that could mislead or reach another place once shown or saved by a client:
+ * a path (`/`, `\`, `.` or `..`), a control character, or an invisible Unicode format character,
+ * such as the right-to-left override that displays `invoice\u202Efdp.exe` as `invoiceexe.pdf`. The
+ * accepted name is put in Unicode NFC form, and its surrounding spaces are trimmed.
  */
 @JvmInline
 value class FileName private constructor(val value: String) {
@@ -21,10 +23,14 @@ value class FileName private constructor(val value: String) {
         const val MAX_LENGTH = StoredFile.FILE_NAME_MAX_LENGTH
 
         fun of(raw: String): FileName {
-            val name = Normalizer.normalize(raw.substringAfterLast('/').substringAfterLast('\\'), Normalizer.Form.NFC)
-                .filterNot { it.isISOControl() }
-                .trim()
-            if (name.isEmpty() || name == "." || name == "..") throw InvalidDocumentException("fileName", "must contain a file name")
+            val name = Normalizer.normalize(raw, Normalizer.Form.NFC).trim()
+            if (name.isEmpty()) throw InvalidDocumentException("fileName", "must contain a file name")
+            if (name == "." || name == ".." || name.any { it == '/' || it == '\\' }) {
+                throw InvalidDocumentException("fileName", "must not contain a path")
+            }
+            if (name.any { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() }) {
+                throw InvalidDocumentException("fileName", "must not contain control or invisible formatting characters")
+            }
             if (name.length > MAX_LENGTH) throw InvalidDocumentException("fileName", "must not exceed $MAX_LENGTH characters")
             return FileName(name)
         }

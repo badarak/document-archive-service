@@ -225,7 +225,7 @@ class ApiOperationFilterIT {
         private const val DOCUMENTS = "/api/v1/documents"
         private const val READ = "documents:read"
         private const val WRITE = "documents:write"
-        private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + ByteArray(64)
+        private val PDF: ByteArray = "%PDF-1.7\n".toByteArray() + ByteArray(64) + "\n%%EOF\n".toByteArray()
 
         @JvmStatic
         @DynamicPropertySource

@@ -12,6 +12,7 @@ import com.badarak.archive.domain.model.InvalidDocumentTypeException
 import com.badarak.archive.domain.model.InvalidSearchException
 import com.badarak.archive.domain.model.InvalidStatusTransitionException
 import com.badarak.archive.domain.model.InvalidTenantIdException
+import com.badarak.archive.domain.model.MalformedDocumentException
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.MissingObjectException
@@ -50,6 +51,7 @@ class ApiExceptionHandler : ResponseEntityExceptionHandler() {
         is UnsupportedDocumentFormatException -> problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "unsupported-format", error.message)
         is ContentTypeMismatchException -> problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "content-type-mismatch", error.message)
         is ContentMismatchException -> problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "content-mismatch", error.message)
+        is MalformedDocumentException -> problem(HttpStatus.UNPROCESSABLE_CONTENT, "malformed-document", error.message)
         is InvalidTenantIdException -> problem(HttpStatus.FORBIDDEN, CALLER_NOT_IDENTIFIED, error.message)
         is DocumentNotFoundException -> problem(HttpStatus.NOT_FOUND, "document-not-found", error.message)
         is InvalidSearchException -> problem(HttpStatus.BAD_REQUEST, "invalid-search", error.message)

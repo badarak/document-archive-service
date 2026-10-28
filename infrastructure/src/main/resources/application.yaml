@@ -20,6 +20,11 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 51MB
+      # Every uploaded file is written to a temporary file, never held in memory, so that it can be read once for its
+      # validation and once for its upload. The temporary files are removed at the end of each request, whatever its
+      # outcome. They go to the temporary directory of the server unless SPRING_SERVLET_MULTIPART_LOCATION names a
+      # private one.
+      file-size-threshold: 0
   liquibase:
     # The archive schema is provisioned outside the application and must exist before startup:
     # Liquibase stores its tracking tables in it.
@@ -57,8 +62,13 @@ archive:
     claims:
       tenant: ${ARCHIVE_JWT_TENANT_CLAIM:tenant_id}
       source: ${ARCHIVE_JWT_SOURCE_CLAIM:azp}
-  documents:
-    allowed-extensions: ${ARCHIVE_ALLOWED_EXTENSIONS:pdf,doc,docx,mp3,wav,m4a,eml}
+  # Validation of the uploaded files. The multipart limits above must let the largest file and its metadata through, or
+  # the application does not start. A declared content type that does not match the format is rejected, or replaced by
+  # the media type of the format when reject-mime-mismatch is off; a content that does not match is always rejected.
+  validation:
+    max-file-size: ${ARCHIVE_MAX_FILE_SIZE:52428800}
+    allowed-extensions: ${ARCHIVE_ALLOWED_EXTENSIONS:pdf,doc,docx,mp3,wav,m4a,ogg,eml}
+    reject-mime-mismatch: ${ARCHIVE_REJECT_MIME_MISMATCH:true}
   # Finishes the deletions left DELETING and abandons the archivings left PENDING, once their grace period is over.
   # The grace period must exceed the storage api-call-timeout, or the application does not start.
   reconciliation:

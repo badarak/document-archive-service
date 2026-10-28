@@ -60,6 +60,47 @@ internal object Samples {
 
     private fun be32(value: Int): ByteArray = bytes(value ushr 24, (value shr 16) and 0xFF, (value shr 8) and 0xFF, value and 0xFF)
 
+    /**
+     * An OLE2 compound file with 512-byte sectors: the header, one allocation table sector, then one directory sector
+     * holding the root entry and up to three entries named [entries] (type 1, a storage, when the name is `Macros`).
+     */
+    fun ole2(vararg entries: String = arrayOf("WordDocument")): ByteArray {
+        val header = ByteArray(512).also {
+            bytes(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1).copyInto(it)
+            le16(0x3E).copyInto(it, 0x18)
+            le16(3).copyInto(it, 0x1A)
+            le16(0xFFFE).copyInto(it, 0x1C)
+            le16(9).copyInto(it, 0x1E)
+            le16(6).copyInto(it, 0x20)
+            le32(1).copyInto(it, 0x2C)
+            le32(1).copyInto(it, 0x30)
+            le32(-2).copyInto(it, 0x44)
+            le32(0).copyInto(it, 0x4C)
+            (1 until 109).forEach { index -> le32(-1).copyInto(it, 0x4C + index * 4) }
+        }
+        val fat = ByteArray(512) { 0xFF.toByte() }.also {
+            le32(-3).copyInto(it, 0)
+            le32(-2).copyInto(it, 4)
+        }
+        val directory = ByteArray(512)
+        (listOf("Root Entry") + entries).forEachIndexed { index, name ->
+            val offset = index * 128
+            val utf16 = (name + "\u0000").toByteArray(Charsets.UTF_16LE)
+            utf16.copyInto(directory, offset)
+            le16(utf16.size).copyInto(directory, offset + 0x40)
+            directory[offset + 0x42] = (
+                if (index == 0) {
+                    5
+                } else if (name == "Macros") {
+                    1
+                } else {
+                    2
+                }
+                ).toByte()
+        }
+        return header + fat + directory
+    }
+
     fun ascii(value: String): ByteArray = value.toByteArray(Charsets.US_ASCII)
 
     fun ByteArray.asContent(): FileContent = FileContent { inputStream() }

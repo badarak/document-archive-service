@@ -17,7 +17,7 @@ class ContentInspectorAdapterTest {
     fun `accepts a well-formed file of each format`() {
         val files = mapOf(
             DocumentFormat.PDF to Samples.pdf(),
-            DocumentFormat.DOC to bytes(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0),
+            DocumentFormat.DOC to Samples.ole2(),
             DocumentFormat.DOCX to Samples.docx(),
             DocumentFormat.EML to Samples.eml(),
             DocumentFormat.MP3 to Samples.mp3(),

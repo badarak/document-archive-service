@@ -27,6 +27,7 @@ class ContentInspectorAdapter : ContentInspector {
 
         private val STRUCTURES: Map<DocumentFormat, StructureCheck> = mapOf(
             DocumentFormat.PDF to PdfStructure,
+            DocumentFormat.DOC to DocStructure,
             DocumentFormat.DOCX to DocxStructure,
             DocumentFormat.MP3 to Mp3Structure,
             DocumentFormat.WAV to WavStructure,

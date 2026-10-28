@@ -163,11 +163,11 @@ blocked or disabled.
 ### Logs
 
 Outside the `local` profile, the logs are JSON lines in the Elastic Common Schema. Each operation of
-the document API writes one line once its answer is complete, downloads included, with in the MDC
-`operation` (`UPLOAD`, `DOWNLOAD`, `DELETE`, `READ`, `SEARCH`) and `documentId`, and as key-value
-pairs `status`, `outcome` (`success`, `client-error`, `server-error`), `durationMs`, `errorCode` (the
-`code` of the error answer) and, only when `ARCHIVE_LOG_TENANT` is `true`, `tenantId`. Requests
-refused by the security are logged too. The content, the token, the storage credentials, the file
+the document API writes one line once its answer is complete, downloads included, with as key-value
+pairs `operation` (`UPLOAD`, `DOWNLOAD`, `DELETE`, `READ`, `SEARCH`), `documentId`, `status`, `outcome`
+(`success`, `client-error`, `server-error`), `durationMs`, `errorCode` (the `code` of the error
+answer) and, only when `ARCHIVE_LOG_TENANT` is `true`, `tenantId`. The other lines of the request,
+such as a stack trace, share its `traceId`. Requests refused by the security are logged too. The content, the token, the storage credentials, the file
 name and the business reference are never logged.
 
 ### Metrics

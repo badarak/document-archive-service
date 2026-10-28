@@ -82,8 +82,8 @@ class ApiOperationFilterIT {
 
         val line = lines.list.single()
         assertEquals(Level.INFO, line.level)
-        assertEquals("UPLOAD", line.mdcPropertyMap["operation"])
-        assertEquals(id, line.mdcPropertyMap["documentId"])
+        assertEquals("UPLOAD", line.value("operation"))
+        assertEquals(id, line.value("documentId")?.toString())
         assertEquals(201, line.value("status"))
         assertEquals("success", line.value("outcome"))
         assertTrue(line.value("durationMs") is Long)
@@ -108,7 +108,7 @@ class ApiOperationFilterIT {
         mockMvc.get(DOCUMENTS)
 
         val line = lines.list.single()
-        assertEquals("SEARCH", line.mdcPropertyMap["operation"])
+        assertEquals("SEARCH", line.value("operation"))
         assertEquals(401, line.value("status"))
         assertEquals("unauthenticated", line.value("errorCode"))
     }
@@ -123,8 +123,8 @@ class ApiOperationFilterIT {
 
         val line = lines.list.single()
         assertEquals(Level.ERROR, line.level)
-        assertEquals("DOWNLOAD", line.mdcPropertyMap["operation"])
-        assertEquals(id, line.mdcPropertyMap["documentId"])
+        assertEquals("DOWNLOAD", line.value("operation"))
+        assertEquals(id, line.value("documentId")?.toString())
         assertEquals("server-error", line.value("outcome"))
         assertEquals("archive-unavailable", line.value("errorCode"))
     }

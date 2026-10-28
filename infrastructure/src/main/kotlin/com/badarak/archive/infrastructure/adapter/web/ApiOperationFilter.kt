@@ -6,7 +6,6 @@ import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import org.slf4j.event.Level
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties
@@ -20,10 +19,10 @@ import java.util.UUID
  * Observes each operation of the document API until its answer is complete, the streaming of a download included. It
  * runs before Spring Security, so that a refused token counts too.
  *
- * - **Log**: one line per operation, with the HTTP status, the outcome, the error code and the duration as key-value
- * pairs. The operation and the document are in the MDC for the whole request, so that every other line it logs carries
- * them too. Nothing else from the request is logged, never the content, the token, the file name nor the business
- * reference; the tenant only when [OperationLogProperties.includeTenant] allows it.
+ * - **Log**: one line per operation, with the operation, the document, the HTTP status, the outcome, the error code and
+ * the duration as key-value pairs. The other lines of the request share its `traceId` with it. Nothing else from the
+ * request is logged, never the content, the token, the file name nor the business reference; the tenant only when
+ * [OperationLogProperties.includeTenant] allows it.
  * - **Metrics**: an observation named after the operation (`archive.upload`, `archive.download`…), hence a timer that
  * counts and times the operations, tagged with their `outcome` and `error.code` only: never an identifier.
  */
@@ -38,9 +37,6 @@ class ApiOperationFilter(private val properties: OperationLogProperties, private
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         val operation = ApiOperation.of(request) ?: return chain.doFilter(request, response)
         val start = System.nanoTime()
-        val documentId = operation.documentId(request)
-        MDC.put(OPERATION, operation.name)
-        documentId?.let { MDC.put(DOCUMENT_ID, it.toString()) }
         val observation = Observation.createNotStarted("archive.${operation.name.lowercase()}", observations).start()
         var failure: Throwable? = null
         try {
@@ -56,23 +52,24 @@ class ApiOperationFilter(private val properties: OperationLogProperties, private
             observation.lowCardinalityKeyValue("outcome", outcome.value)
                 .lowCardinalityKeyValue("error.code", errorCode ?: NONE)
                 .stop()
-            if (documentId == null) createdDocument(response)?.let { MDC.put(DOCUMENT_ID, it.toString()) }
-            log(operation, request, response.status, outcome, errorCode, durationMs)
-            MDC.remove(OPERATION)
-            MDC.remove(DOCUMENT_ID)
+            log(operation, request, response, outcome, errorCode, durationMs)
         }
     }
 
     private fun log(
         operation: ApiOperation,
         request: HttpServletRequest,
-        status: Int,
+        response: HttpServletResponse,
         outcome: OperationOutcome,
         errorCode: String?,
         durationMs: Long,
     ) {
+        val status = response.status
+        val documentId = operation.documentId(request) ?: createdDocument(response)
         val tenant = request.getAttribute(TENANT).takeIf { properties.includeTenant }
         log.atLevel(if (outcome == OperationOutcome.SERVER_ERROR) Level.ERROR else Level.INFO)
+            .addKeyValue("operation", operation.name)
+            .apply { documentId?.let { addKeyValue("documentId", it) } }
             .addKeyValue("status", status)
             .addKeyValue("outcome", outcome.value)
             .addKeyValue("durationMs", durationMs)
@@ -94,8 +91,6 @@ class ApiOperationFilter(private val properties: OperationLogProperties, private
         /** Request attribute holding the tenant of the caller, set once the access token is read. */
         const val TENANT = "archive.tenantId"
 
-        private const val OPERATION = "operation"
-        private const val DOCUMENT_ID = "documentId"
         private const val INTERNAL_ERROR = "internal-error"
         private const val NONE = "none"
     }

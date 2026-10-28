@@ -25,23 +25,32 @@ import com.badarak.archive.infrastructure.adapter.scheduling.ReconciliationMetri
 import com.badarak.archive.infrastructure.adapter.scheduling.ReconciliationReport
 import com.badarak.archive.infrastructure.adapter.storage.S3StorageProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Clock
 
 @Configuration
-@EnableConfigurationProperties(ArchivingProperties::class, ReconciliationProperties::class)
+@EnableConfigurationProperties(ValidationProperties::class, ReconciliationProperties::class)
 class ArchivingConfiguration {
 
     @Bean
     fun clock(): Clock = Clock.systemUTC()
 
     @Bean
-    fun documentSizePolicy(): DocumentSizePolicy = DocumentSizePolicy()
+    fun documentSizePolicy(properties: ValidationProperties, multipart: MultipartProperties): DocumentSizePolicy {
+        val maxSize = properties.maxFileSize
+        require(multipart.maxFileSize >= maxSize && multipart.maxRequestSize > maxSize) {
+            "spring.servlet.multipart.max-file-size (${multipart.maxFileSize}) must be at least archive.validation.max-file-size " +
+                "($maxSize), and spring.servlet.multipart.max-request-size (${multipart.maxRequestSize}) above it, so that the " +
+                "request carrying the largest file and its metadata reaches the validation"
+        }
+        return DocumentSizePolicy(maxSize.toBytes())
+    }
 
     @Bean
-    fun documentFormatPolicy(properties: ArchivingProperties): DocumentFormatPolicy =
-        DocumentFormatPolicy.ofExtensions(properties.allowedExtensions)
+    fun documentFormatPolicy(properties: ValidationProperties): DocumentFormatPolicy =
+        DocumentFormatPolicy.ofExtensions(properties.allowedExtensions, properties.rejectMimeMismatch)
 
     @Bean
     fun archiveDocumentUseCase(

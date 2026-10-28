@@ -3,8 +3,8 @@ package com.badarak.archive.domain.model
 /**
  * File formats the service knows how to archive, identified by their extension.
  *
- * Each format lists the content types a caller may declare for it and, when the format has one,
- * the signature its first bytes must carry. E-mails are plain text: their content cannot be checked.
+ * Each format lists the content types a caller may declare for it, the first one being its own [mediaType], and, when
+ * the format has one, the signature its first bytes must carry. E-mails are plain text: their content cannot be checked.
  */
 enum class DocumentFormat(val extension: String, val contentTypes: Set<String>, private val signature: ((ByteArray) -> Boolean)?) {
     PDF("pdf", setOf("application/pdf"), { it.hasAt(0, "%PDF-") }),
@@ -15,6 +15,9 @@ enum class DocumentFormat(val extension: String, val contentTypes: Set<String>, 
     M4A("m4a", setOf("audio/mp4", "audio/x-m4a", "audio/m4a"), { it.hasAt(4, "ftyp") }),
     EML("eml", setOf("message/rfc822"), null),
     ;
+
+    val mediaType: String
+        get() = contentTypes.first()
 
     fun matchesContent(header: ByteArray): Boolean = signature?.invoke(header) ?: true
 

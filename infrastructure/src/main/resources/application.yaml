@@ -57,8 +57,13 @@ archive:
     claims:
       tenant: ${ARCHIVE_JWT_TENANT_CLAIM:tenant_id}
       source: ${ARCHIVE_JWT_SOURCE_CLAIM:azp}
-  documents:
+  # Validation of the uploaded files. The multipart limits above must let the largest file and its metadata through, or
+  # the application does not start. A declared content type that does not match the format is rejected, or replaced by
+  # the media type of the format when reject-mime-mismatch is off; a content that does not match is always rejected.
+  validation:
+    max-file-size: ${ARCHIVE_MAX_FILE_SIZE:52428800}
     allowed-extensions: ${ARCHIVE_ALLOWED_EXTENSIONS:pdf,doc,docx,mp3,wav,m4a,eml}
+    reject-mime-mismatch: ${ARCHIVE_REJECT_MIME_MISMATCH:true}
   # Finishes the deletions left DELETING and abandons the archivings left PENDING, once their grace period is over.
   # The grace period must exceed the storage api-call-timeout, or the application does not start.
   reconciliation:

@@ -13,6 +13,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -63,7 +64,8 @@ class ArchivingConfigurationIT {
     }
 
     @Test
-    fun `every supported format is allowed when no extension list is configured`() {
+    fun `every supported format is allowed, and a mismatching declared content type rejected, by default`() {
         assertEquals(DocumentFormat.entries.toSet(), formatPolicy.allowedFormats)
+        assertTrue(formatPolicy.rejectMimeMismatch)
     }
 }

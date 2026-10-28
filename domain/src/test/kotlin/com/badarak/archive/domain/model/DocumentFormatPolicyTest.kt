@@ -1,7 +1,9 @@
 package com.badarak.archive.domain.model
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -58,6 +60,30 @@ class DocumentFormatPolicyTest {
         assertEquals(DocumentFormat.PDF, exception.format)
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["application/octet-stream", "text/plain", ""])
+    fun `stores the media type of the format when a mismatching declaration is tolerated`(contentType: String) {
+        val tolerant = DocumentFormatPolicy(rejectMimeMismatch = false)
+
+        assertEquals("application/pdf", tolerant.check(FileName.of("invoice.pdf"), contentType, PDF_HEADER))
+    }
+
+    @Test
+    fun `keeps a matching declaration when a mismatching one is tolerated`() {
+        val tolerant = DocumentFormatPolicy(rejectMimeMismatch = false)
+
+        assertEquals("audio/x-wav", tolerant.check(FileName.of("call.wav"), "audio/x-wav", WAV_HEADER))
+    }
+
+    @Test
+    fun `never lets through content that does not match the extension, even when a mismatching declaration is tolerated`() {
+        val tolerant = DocumentFormatPolicy(rejectMimeMismatch = false)
+
+        assertThrows(ContentMismatchException::class.java) {
+            tolerant.check(FileName.of("invoice.pdf"), "application/pdf", "MZ\u0090\u0000".toByteArray(Charsets.ISO_8859_1))
+        }
+    }
+
     @Test
     fun `rejects content that does not match the extension`() {
         val exception = assertThrows(ContentMismatchException::class.java) {
@@ -77,6 +103,12 @@ class DocumentFormatPolicyTest {
         val configured = DocumentFormatPolicy.ofExtensions(listOf("pdf", " DOCX "))
 
         assertEquals(setOf(DocumentFormat.PDF, DocumentFormat.DOCX), configured.allowedFormats)
+        assertTrue(configured.rejectMimeMismatch)
+    }
+
+    @Test
+    fun `builds a policy that tolerates a mismatching declaration from configuration`() {
+        assertFalse(DocumentFormatPolicy.ofExtensions(listOf("pdf"), rejectMimeMismatch = false).rejectMimeMismatch)
     }
 
     @Test
@@ -96,5 +128,6 @@ class DocumentFormatPolicyTest {
 
     private companion object {
         val PDF_HEADER = "%PDF-1.7\n%".toByteArray(Charsets.US_ASCII)
+        val WAV_HEADER = "RIFF\u0024\u0008\u0000\u0000WAVE".toByteArray(Charsets.ISO_8859_1)
     }
 }

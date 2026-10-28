@@ -2,6 +2,7 @@ package com.badarak.archive.domain.model
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -11,6 +12,7 @@ import org.junit.jupiter.params.provider.ValueSource
 class DocumentFormatPolicyTest {
 
     private val policy = DocumentFormatPolicy()
+    private val conforming = ContentInspection.Conforming
 
     @Test
     fun `allows every known format by default`() {
@@ -18,22 +20,15 @@ class DocumentFormatPolicyTest {
     }
 
     @Test
-    fun `returns the media type of a conforming document`() {
-        assertEquals("application/pdf", policy.check(FileName.of("invoice.pdf"), "application/pdf", PDF_HEADER))
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["application/pdf; charset=binary", "Application/PDF", " application/pdf ", " application/pdf ; charset=binary"])
-    fun `reduces the declared content type to its media type, whatever its case and parameters`(contentType: String) {
-        assertEquals("application/pdf", policy.check(FileName.of("invoice.pdf"), contentType, PDF_HEADER))
+    fun `finds the format a file name announces by its extension`() {
+        assertEquals(DocumentFormat.PDF, policy.formatOf(FileName.of("invoice.pdf")))
+        assertEquals(DocumentFormat.DOCX, policy.formatOf(FileName.of("REPORT.DOCX")))
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["setup.exe", "photo.png", "README"])
     fun `rejects an unknown or missing extension`(fileName: String) {
-        val exception = assertThrows(UnsupportedDocumentFormatException::class.java) {
-            policy.check(FileName.of(fileName), "application/pdf", PDF_HEADER)
-        }
+        val exception = assertThrows(UnsupportedDocumentFormatException::class.java) { policy.formatOf(FileName.of(fileName)) }
 
         assertEquals(fileName, exception.fileName)
     }
@@ -42,19 +37,26 @@ class DocumentFormatPolicyTest {
     fun `rejects a known format that is not allowed`() {
         val pdfOnly = DocumentFormatPolicy(setOf(DocumentFormat.PDF))
 
-        val exception = assertThrows(UnsupportedDocumentFormatException::class.java) {
-            pdfOnly.check(FileName.of("letter.eml"), "message/rfc822", ByteArray(0))
-        }
+        val exception = assertThrows(UnsupportedDocumentFormatException::class.java) { pdfOnly.formatOf(FileName.of("letter.eml")) }
 
         assertEquals(listOf("pdf"), exception.allowedExtensions)
     }
 
+    @Test
+    fun `returns the media type of a conforming document`() {
+        assertEquals("application/pdf", policy.check(DocumentFormat.PDF, "application/pdf", conforming))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["application/pdf; charset=binary", "Application/PDF", " application/pdf ", " application/pdf ; charset=binary"])
+    fun `reduces the declared content type to its media type, whatever its case and parameters`(contentType: String) {
+        assertEquals("application/pdf", policy.check(DocumentFormat.PDF, contentType, conforming))
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["application/octet-stream", "application/msword", "text/plain", ""])
-    fun `rejects a declared content type that does not match the extension`(contentType: String) {
-        val exception = assertThrows(ContentTypeMismatchException::class.java) {
-            policy.check(FileName.of("invoice.pdf"), contentType, PDF_HEADER)
-        }
+    fun `rejects a declared content type that does not match the format`(contentType: String) {
+        val exception = assertThrows(ContentTypeMismatchException::class.java) { policy.check(DocumentFormat.PDF, contentType, conforming) }
 
         assertEquals(contentType, exception.declaredContentType)
         assertEquals(DocumentFormat.PDF, exception.format)
@@ -65,37 +67,44 @@ class DocumentFormatPolicyTest {
     fun `stores the media type of the format when a mismatching declaration is tolerated`(contentType: String) {
         val tolerant = DocumentFormatPolicy(rejectMimeMismatch = false)
 
-        assertEquals("application/pdf", tolerant.check(FileName.of("invoice.pdf"), contentType, PDF_HEADER))
+        assertEquals("application/pdf", tolerant.check(DocumentFormat.PDF, contentType, conforming))
     }
 
     @Test
     fun `keeps a matching declaration when a mismatching one is tolerated`() {
         val tolerant = DocumentFormatPolicy(rejectMimeMismatch = false)
 
-        assertEquals("audio/x-wav", tolerant.check(FileName.of("call.wav"), "audio/x-wav", WAV_HEADER))
+        assertEquals("audio/x-wav", tolerant.check(DocumentFormat.WAV, "audio/x-wav", conforming))
     }
 
     @Test
-    fun `never lets through content that does not match the extension, even when a mismatching declaration is tolerated`() {
-        val tolerant = DocumentFormatPolicy(rejectMimeMismatch = false)
-
-        assertThrows(ContentMismatchException::class.java) {
-            tolerant.check(FileName.of("invoice.pdf"), "application/pdf", "MZ\u0090\u0000".toByteArray(Charsets.ISO_8859_1))
-        }
-    }
-
-    @Test
-    fun `rejects content that does not match the extension`() {
+    fun `rejects content of another format, naming what it is`() {
         val exception = assertThrows(ContentMismatchException::class.java) {
-            policy.check(FileName.of("invoice.pdf"), "application/pdf", "MZ\u0090\u0000".toByteArray(Charsets.ISO_8859_1))
+            policy.check(DocumentFormat.PDF, "application/pdf", ContentInspection.OtherFormat("application/x-executable"))
         }
 
         assertEquals(DocumentFormat.PDF, exception.format)
+        assertEquals("application/x-executable", exception.detectedMediaType)
+        assertEquals("The content does not match a .pdf file: it is application/x-executable", exception.message)
     }
 
     @Test
-    fun `accepts an e-mail whatever its content`() {
-        assertEquals("message/rfc822", policy.check(FileName.of("message.eml"), "message/rfc822", "From: a@b.c".toByteArray()))
+    fun `rejects content of an unrecognised format`() {
+        val exception = assertThrows(ContentMismatchException::class.java) {
+            policy.check(DocumentFormat.PDF, "application/pdf", ContentInspection.OtherFormat(null))
+        }
+
+        assertNull(exception.detectedMediaType)
+        assertEquals("The content does not match a .pdf file", exception.message)
+    }
+
+    @Test
+    fun `never lets through content of another format, even when a mismatching declaration is tolerated`() {
+        val tolerant = DocumentFormatPolicy(rejectMimeMismatch = false)
+
+        assertThrows(ContentMismatchException::class.java) {
+            tolerant.check(DocumentFormat.PDF, "application/octet-stream", ContentInspection.OtherFormat(null))
+        }
     }
 
     @Test
@@ -124,10 +133,5 @@ class DocumentFormatPolicyTest {
     @Test
     fun `requires at least one allowed format`() {
         assertThrows(IllegalArgumentException::class.java) { DocumentFormatPolicy(emptySet()) }
-    }
-
-    private companion object {
-        val PDF_HEADER = "%PDF-1.7\n%".toByteArray(Charsets.US_ASCII)
-        val WAV_HEADER = "RIFF\u0024\u0008\u0000\u0000WAVE".toByteArray(Charsets.ISO_8859_1)
     }
 }

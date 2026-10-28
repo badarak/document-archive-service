@@ -2,10 +2,10 @@ package com.badarak.archive.domain.model
 
 /**
  * Business rule on the format of an archived document: its extension must name one of
- * [allowedFormats], and the first [DocumentFormat.HEADER_LENGTH] bytes of the content must match
- * that format when it has a signature. The content type declared by the caller must match the
- * format too, unless [rejectMimeMismatch] is off: a wrong declaration is then replaced by the media
- * type of the format. The content itself is never let through when it does not match.
+ * [allowedFormats], and its content must really be a file of that format. The content type
+ * declared by the caller must match the format too, unless [rejectMimeMismatch] is off: a wrong
+ * declaration is then replaced by the media type of the format. The content itself is never let
+ * through when it does not match.
  *
  * Built from configuration with [ofExtensions], where an extension the service does not know is an error.
  */
@@ -17,18 +17,23 @@ class DocumentFormatPolicy(allowedFormats: Set<DocumentFormat> = DocumentFormat.
     }
 
     /**
-     * Checks a document against the rule and returns the media type to store: the declared content type without
-     * parameters, surrounding spaces nor upper case, or the media type of the format when a mismatching declaration is
-     * tolerated.
+     * Returns the format a file name announces by its extension.
      *
      * @throws UnsupportedDocumentFormatException when the extension names no allowed format
-     * @throws ContentTypeMismatchException when the declared content type does not match the format, and that is rejected
-     * @throws ContentMismatchException when the content does not match the format
      */
-    fun check(fileName: FileName, declaredContentType: String, contentHeader: ByteArray): String {
-        val format = DocumentFormat.ofExtension(fileName.extension)?.takeIf { it in allowedFormats }
-            ?: throw UnsupportedDocumentFormatException(fileName.value, allowedFormats.map { it.extension })
-        if (!format.matchesContent(contentHeader)) throw ContentMismatchException(format)
+    fun formatOf(fileName: FileName): DocumentFormat = DocumentFormat.ofExtension(fileName.extension)?.takeIf { it in allowedFormats }
+        ?: throw UnsupportedDocumentFormatException(fileName.value, allowedFormats.map { it.extension })
+
+    /**
+     * Checks a document of [format] against the rule, from the inspection of its content, and returns the media type to
+     * store: the declared content type without parameters, surrounding spaces nor upper case, or the media type of the
+     * format when a mismatching declaration is tolerated.
+     *
+     * @throws ContentMismatchException when the content is not a file of the format
+     * @throws ContentTypeMismatchException when the declared content type does not match the format, and that is rejected
+     */
+    fun check(format: DocumentFormat, declaredContentType: String, inspection: ContentInspection): String {
+        if (inspection is ContentInspection.OtherFormat) throw ContentMismatchException(format, inspection.detectedMediaType)
         val mediaType = declaredContentType.substringBefore(';').trim().lowercase()
         return when {
             mediaType in format.contentTypes -> mediaType

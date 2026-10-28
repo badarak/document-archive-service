@@ -2,6 +2,9 @@ package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.ArchivingAbandonedException
+import com.badarak.archive.domain.model.ContentInspection
+import com.badarak.archive.domain.model.ContentMismatchException
+import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentMetadata
 import com.badarak.archive.domain.model.DocumentSizePolicy
@@ -17,6 +20,7 @@ import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.AuthenticatedCaller
 import com.badarak.archive.domain.port.inbound.UploadedFile
+import com.badarak.archive.domain.port.outbound.ContentInspector
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
@@ -49,10 +53,12 @@ class ArchiveDocumentServiceTest {
 
     private val documents = mockk<DocumentRepository>()
     private val storage = mockk<ObjectStorage>()
+    private val inspector = mockk<ContentInspector>()
     private val service = ArchiveDocumentService(
         documents = documents,
         storage = storage,
         formatPolicy = DocumentFormatPolicy(),
+        inspector = inspector,
         sizePolicy = DocumentSizePolicy(maxSizeBytes = 1_000),
         clock = Clock.fixed(now, ZoneOffset.UTC),
     )
@@ -66,6 +72,10 @@ class ArchiveDocumentServiceTest {
         every { documents.transition(capture(saved), any()) } returns true
         every { storage.store(any(), any(), any(), any()) } answers { uploaded = secondArg<InputStream>().readAllBytes() }
         every { storage.delete(any()) } just Runs
+        every { inspector.inspect(any(), any(), any()) } answers {
+            firstArg<FileContent>().open().use { it.read() }
+            ContentInspection.Conforming
+        }
     }
 
     @Nested
@@ -127,6 +137,30 @@ class ArchiveDocumentServiceTest {
             assertThrows(UnsupportedDocumentFormatException::class.java) { service.archive(command(fileName = "setup.exe")) }
 
             assertNothingWritten()
+        }
+
+        @Test
+        fun `the content is inspected as a file of the format its extension announces`() {
+            service.archive(command(fileName = "call.wav", contentType = "audio/wav"))
+
+            verify { inspector.inspect(any(), content.size.toLong(), DocumentFormat.WAV) }
+        }
+
+        @Test
+        fun `a content of another format leaves no trace`() {
+            every { inspector.inspect(any(), any(), any()) } returns ContentInspection.OtherFormat("application/x-executable")
+
+            val exception = assertThrows(ContentMismatchException::class.java) { service.archive(command()) }
+
+            assertEquals("The content does not match a .pdf file: it is application/x-executable", exception.message)
+            assertNothingWritten()
+        }
+
+        @Test
+        fun `an unsupported format is refused before its content is inspected`() {
+            assertThrows(UnsupportedDocumentFormatException::class.java) { service.archive(command(fileName = "setup.exe")) }
+
+            verify(exactly = 0) { inspector.inspect(any(), any(), any()) }
         }
 
         @Test

@@ -10,6 +10,7 @@ import com.badarak.archive.domain.port.inbound.DownloadDocumentUseCase
 import com.badarak.archive.domain.port.inbound.GetDocumentUseCase
 import com.badarak.archive.domain.port.inbound.ResumeDeletionsUseCase
 import com.badarak.archive.domain.port.inbound.SearchDocumentsUseCase
+import com.badarak.archive.domain.port.outbound.ContentInspector
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
 import com.badarak.archive.domain.service.AbandonStalledArchivingsService
@@ -57,9 +58,10 @@ class ArchivingConfiguration {
         documents: DocumentRepository,
         storage: ObjectStorage,
         formatPolicy: DocumentFormatPolicy,
+        inspector: ContentInspector,
         sizePolicy: DocumentSizePolicy,
         clock: Clock,
-    ): ArchiveDocumentUseCase = ArchiveDocumentService(documents, storage, formatPolicy, sizePolicy, clock)
+    ): ArchiveDocumentUseCase = ArchiveDocumentService(documents, storage, formatPolicy, inspector, sizePolicy, clock)
 
     @Bean
     fun getDocumentUseCase(documents: DocumentRepository): GetDocumentUseCase = GetDocumentService(documents)

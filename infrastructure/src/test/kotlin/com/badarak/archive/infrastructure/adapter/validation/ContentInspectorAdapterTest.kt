@@ -1,0 +1,93 @@
+package com.badarak.archive.infrastructure.adapter.validation
+
+import com.badarak.archive.domain.model.ContentInspection
+import com.badarak.archive.domain.model.DocumentFormat
+import com.badarak.archive.domain.model.FileContent
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
+import java.io.InputStream
+
+class ContentInspectorAdapterTest {
+
+    private val inspector = ContentInspectorAdapter()
+
+    @Test
+    fun `recognises each format from the first bytes of a real file`() {
+        val headers = mapOf(
+            DocumentFormat.PDF to ascii("%PDF-1.7\n%"),
+            DocumentFormat.DOC to bytes(0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0, 0, 0),
+            DocumentFormat.DOCX to bytes(0x50, 0x4B, 0x03, 0x04, 0x14, 0, 0x06, 0, 0x08, 0, 0, 0),
+            DocumentFormat.MP3 to ascii("ID3") + bytes(0x04, 0, 0, 0, 0, 0, 0x23, 0, 0),
+            DocumentFormat.WAV to ascii("RIFF") + bytes(0x24, 0x08, 0, 0) + ascii("WAVE"),
+            DocumentFormat.M4A to bytes(0, 0, 0, 0x20) + ascii("ftypM4A "),
+        )
+
+        headers.forEach { (format, header) -> assertEquals(ContentInspection.Conforming, inspect(header, format), "$format") }
+    }
+
+    @Test
+    fun `recognises an mp3 file without ID3 tag from its frame header`() {
+        assertEquals(ContentInspection.Conforming, inspect(bytes(0xFF, 0xFB, 0x90, 0x64), DocumentFormat.MP3))
+    }
+
+    @ParameterizedTest
+    @EnumSource(DocumentFormat::class, names = ["EML"], mode = EnumSource.Mode.EXCLUDE)
+    fun `rejects content that carries another signature`(format: DocumentFormat) {
+        assertEquals(ContentInspection.OtherFormat(null), inspect(ascii("GIF89a......"), format))
+    }
+
+    @ParameterizedTest
+    @EnumSource(DocumentFormat::class, names = ["EML"], mode = EnumSource.Mode.EXCLUDE)
+    fun `rejects content too short to carry the signature`(format: DocumentFormat) {
+        assertEquals(ContentInspection.OtherFormat(null), inspect(ascii("%P"), format))
+    }
+
+    @Test
+    fun `wav needs both the RIFF container and the WAVE type`() {
+        val video = ascii("RIFF") + bytes(0x24, 0x08, 0, 0) + ascii("AVI ")
+
+        assertEquals(ContentInspection.OtherFormat(null), inspect(video, DocumentFormat.WAV))
+    }
+
+    @ParameterizedTest
+    @EnumSource(DocumentFormat::class)
+    fun `never takes a Windows program for a document, whatever its format`(format: DocumentFormat) {
+        val program = ascii("MZ") + ByteArray(62)
+
+        assertEquals(ContentInspection.OtherFormat("application/vnd.microsoft.portable-executable"), inspect(program, format))
+    }
+
+    @Test
+    fun `recognises the programs of every system and scripts`() {
+        mapOf(
+            bytes(0x7F, 0x45, 0x4C, 0x46, 2, 1) to "application/x-executable",
+            bytes(0xCF, 0xFA, 0xED, 0xFE, 7, 0) to "application/x-mach-binary",
+            bytes(0xFE, 0xED, 0xFA, 0xCE, 0, 0) to "application/x-mach-binary",
+            bytes(0xCA, 0xFE, 0xBA, 0xBE, 0, 0) to "application/x-mach-binary",
+            ascii("#!/bin/sh\nrm -rf /") to "text/x-script",
+        ).forEach { (header, mediaType) ->
+            assertEquals(ContentInspection.OtherFormat(mediaType), inspect(header, DocumentFormat.EML), mediaType)
+        }
+    }
+
+    @Test
+    fun `reads only the first bytes of the content`() {
+        var read = 0
+        val content = FileContent {
+            object : InputStream() {
+                override fun read(): Int = if (read++ < 1_000_000) 'A'.code else -1
+            }
+        }
+
+        inspector.inspect(content, 1_000_000, DocumentFormat.EML)
+
+        assertEquals(ContentInspectorAdapter.HEADER_LENGTH, read)
+    }
+
+    private fun inspect(content: ByteArray, format: DocumentFormat): ContentInspection =
+        inspector.inspect(FileContent { content.inputStream() }, content.size.toLong(), format)
+
+    private fun ascii(value: String): ByteArray = value.toByteArray(Charsets.US_ASCII)
+}

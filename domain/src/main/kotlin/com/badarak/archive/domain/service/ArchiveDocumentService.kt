@@ -2,7 +2,6 @@ package com.badarak.archive.domain.service
 
 import com.badarak.archive.domain.model.ArchivedDocument
 import com.badarak.archive.domain.model.ArchivingAbandonedException
-import com.badarak.archive.domain.model.DocumentFormat
 import com.badarak.archive.domain.model.DocumentFormatPolicy
 import com.badarak.archive.domain.model.DocumentId
 import com.badarak.archive.domain.model.DocumentOwner
@@ -14,6 +13,7 @@ import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.StoredFile
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentCommand
 import com.badarak.archive.domain.port.inbound.ArchiveDocumentUseCase
+import com.badarak.archive.domain.port.outbound.ContentInspector
 import com.badarak.archive.domain.port.outbound.DocumentPersistenceException
 import com.badarak.archive.domain.port.outbound.DocumentRepository
 import com.badarak.archive.domain.port.outbound.ObjectStorage
@@ -36,6 +36,7 @@ class ArchiveDocumentService(
     private val documents: DocumentRepository,
     private val storage: ObjectStorage,
     private val formatPolicy: DocumentFormatPolicy,
+    private val inspector: ContentInspector,
     private val sizePolicy: DocumentSizePolicy,
     private val clock: Clock,
 ) : ArchiveDocumentUseCase {
@@ -53,7 +54,8 @@ class ArchiveDocumentService(
         val file = command.file
         val fileName = FileName.of(file.fileName)
         sizePolicy.check(file.sizeBytes)
-        val mediaType = formatPolicy.check(fileName, file.contentType, readHeader(file.content))
+        val format = formatPolicy.formatOf(fileName)
+        val mediaType = formatPolicy.check(format, file.contentType, inspector.inspect(file.content, file.sizeBytes, format))
         return ArchivedDocument.create(
             id = DocumentId.generate(),
             owner = DocumentOwner(command.caller.tenantId, command.caller.source),
@@ -62,8 +64,6 @@ class ArchiveDocumentService(
             now = clock.instant(),
         )
     }
-
-    private fun readHeader(content: FileContent): ByteArray = content.open().use { it.readNBytes(DocumentFormat.HEADER_LENGTH) }
 
     private fun upload(pending: ArchivedDocument, content: FileContent) {
         try {

@@ -35,6 +35,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.multipart
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
@@ -96,6 +97,7 @@ class ApiOperationFilterIT {
         upload(file("salaries-2026.txt", "text/plain", "secret".toByteArray()))
 
         val line = lines.list.single()
+        assertEquals(Level.INFO, line.level)
         assertEquals(415, line.value("status"))
         assertEquals("client-error", line.value("outcome"))
         assertEquals("unsupported-format", line.value("errorCode"))
@@ -104,13 +106,34 @@ class ApiOperationFilterIT {
     }
 
     @Test
-    fun `a request refused by the security is logged too`() {
+    fun `a request without token is logged as an info, as anyone can send one`() {
         mockMvc.get(DOCUMENTS)
 
         val line = lines.list.single()
+        assertEquals(Level.INFO, line.level)
         assertEquals("SEARCH", line.value("operation"))
         assertEquals(401, line.value("status"))
         assertEquals("unauthenticated", line.value("errorCode"))
+    }
+
+    @Test
+    fun `a token without the scope of the operation is logged as a warning`() {
+        mockMvc.get("$DOCUMENTS/${UUID.randomUUID()}") { bearer(WRITE) }
+
+        val line = lines.list.single()
+        assertEquals(Level.WARN, line.level)
+        assertEquals(403, line.value("status"))
+        assertEquals("access-denied", line.value("errorCode"))
+    }
+
+    @Test
+    fun `an unknown document is logged as an info, as an ordinary answer of the API`() {
+        mockMvc.get("$DOCUMENTS/${UUID.randomUUID()}") { bearer(READ) }
+
+        val line = lines.list.single()
+        assertEquals(Level.INFO, line.level)
+        assertEquals(404, line.value("status"))
+        assertEquals("client-error", line.value("outcome"))
     }
 
     @Test

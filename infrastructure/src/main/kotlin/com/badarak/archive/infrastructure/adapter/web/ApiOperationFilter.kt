@@ -11,6 +11,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import java.util.UUID
@@ -22,7 +23,8 @@ import java.util.UUID
  * - **Log**: one line per operation, with the operation, the document, the HTTP status, the outcome, the error code and
  * the duration as key-value pairs. The other lines of the request share its `traceId` with it. Nothing else from the
  * request is logged, never the content, the token, the file name nor the business reference; the tenant only when
- * [OperationLogProperties.includeTenant] allows it.
+ * [OperationLogProperties.includeTenant] allows it. The line is an ERROR for a server error, a WARN for an authenticated
+ * caller refused by its scopes (403), and an INFO otherwise: the other client errors are ordinary answers of the API.
  * - **Metrics**: an observation named after the operation (`archive.upload`, `archive.download`…), hence a timer that
  * counts and times the operations, tagged with their `outcome` and `error.code` only: never an identifier.
  */
@@ -67,7 +69,7 @@ class ApiOperationFilter(private val properties: OperationLogProperties, private
         val status = response.status
         val documentId = operation.documentId(request) ?: createdDocument(response)
         val tenant = request.getAttribute(TENANT).takeIf { properties.includeTenant }
-        log.atLevel(if (outcome == OperationOutcome.SERVER_ERROR) Level.ERROR else Level.INFO)
+        log.atLevel(level(status, outcome))
             .addKeyValue("operation", operation.name)
             .apply { documentId?.let { addKeyValue("documentId", it) } }
             .addKeyValue("status", status)
@@ -76,6 +78,12 @@ class ApiOperationFilter(private val properties: OperationLogProperties, private
             .apply { errorCode?.let { addKeyValue("errorCode", it) } }
             .apply { tenant?.let { addKeyValue("tenantId", it) } }
             .log("{} answered {}{} in {} ms", operation, status, errorCode?.let { " ($it)" }.orEmpty(), durationMs)
+    }
+
+    private fun level(status: Int, outcome: OperationOutcome): Level = when {
+        outcome == OperationOutcome.SERVER_ERROR -> Level.ERROR
+        status == HttpStatus.FORBIDDEN.value() -> Level.WARN
+        else -> Level.INFO
     }
 
     private fun errorCode(request: HttpServletRequest, outcome: OperationOutcome): String? =

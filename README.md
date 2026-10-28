@@ -127,6 +127,33 @@ The answer is `201 Created`, with the document's `Location` and metadata. Errors
 documents (RFC 9457) with a `code` property, such as `unsupported-format` or `document-too-large`;
 the OpenAPI description lists them per status.
 
+Before anything is recorded or uploaded, the file is validated; a refused file leaves no trace and
+never becomes `AVAILABLE`:
+
+| Check | Refusal |
+|---|---|
+| Not empty, and not above `ARCHIVE_MAX_FILE_SIZE` (50 MiB by default) | `400 empty-document`, `413 document-too-large` |
+| A file name without path (`/`, `\`, `..`), control character nor invisible formatting character (such as a right-to-left override) | `400 invalid-document` |
+| An extension among `ARCHIVE_ALLOWED_EXTENSIONS` | `415 unsupported-format` |
+| A declared content type matching the extension (or replaced by the media type of the format, with `ARCHIVE_REJECT_MIME_MISMATCH=false`) | `415 content-type-mismatch` |
+| A content of the format the extension announces, read from its first bytes; a program (Windows, Linux, macOS, script) is never accepted, whatever its name | `415 content-mismatch` |
+| A well-formed file of that format (below) | `422 malformed-document` |
+
+| Format | Structure checked |
+|---|---|
+| PDF | An end-of-file marker in the last kilobyte |
+| DOC | An OLE2 compound file holding a `WordDocument` stream, without `Macros` storage |
+| DOCX | A ZIP package listing `[Content_Types].xml` and `word/document.xml`, without VBA project (macros) |
+| MP3 | Two consecutive valid MPEG audio frames, shortly after the optional ID3 tag |
+| WAV | A RIFF file whose format chunk (encoding, channels, sample rate) comes before its audio data |
+| M4A | An MPEG-4 file type box naming an audio or generic MPEG-4 brand |
+| OGG | A first page opening a Vorbis, Opus, FLAC or Speex stream |
+| EML | Text starting with RFC 5322 header fields, among them `From` or `Date`, in its first 64 KiB |
+
+Only bounded parts of the file are read for these checks, from the temporary file of the upload:
+nothing is decompressed nor loaded whole into memory. They tell what a file is, not that it is
+harmless: a well-formed PDF may still carry malicious content.
+
 A deletion first records the document as `DELETING`, which hides it, then removes its content from
 the storage and records it as `DELETED`. When the storage fails in between, the answer is `503` and
 the document stays `DELETING`: replaying the `DELETE` finishes it, and so does the reconciliation that

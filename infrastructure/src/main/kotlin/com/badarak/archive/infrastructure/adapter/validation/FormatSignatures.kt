@@ -15,6 +15,7 @@ internal object FormatSignatures {
         DocumentFormat.MP3 -> header.hasAt(0, "ID3") || header.startsWithMpegFrame()
         DocumentFormat.WAV -> header.hasAt(0, "RIFF") && header.hasAt(8, "WAVE")
         DocumentFormat.M4A -> header.hasAt(4, "ftyp")
+        DocumentFormat.OGG -> header.hasAt(0, "OggS")
         DocumentFormat.EML -> true
     }
 

@@ -12,6 +12,7 @@ enum class DocumentFormat(val extension: String, val contentTypes: Set<String>) 
     MP3("mp3", setOf("audio/mpeg", "audio/mp3")),
     WAV("wav", setOf("audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave")),
     M4A("m4a", setOf("audio/mp4", "audio/x-m4a", "audio/m4a")),
+    OGG("ogg", setOf("audio/ogg", "application/ogg", "audio/vorbis", "audio/opus")),
     EML("eml", setOf("message/rfc822")),
     ;
 

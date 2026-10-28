@@ -101,6 +101,12 @@ internal object Samples {
         return header + fat + directory
     }
 
+    /** The first page of an Ogg stream whose first packet starts with [codec], as an encoder writes it. */
+    fun ogg(codec: ByteArray = bytes(0x01) + ascii("vorbis")): ByteArray {
+        val packet = codec + ByteArray(30 - codec.size)
+        return ascii("OggS") + bytes(0, 0x02) + ByteArray(20) + bytes(1, packet.size) + packet
+    }
+
     fun ascii(value: String): ByteArray = value.toByteArray(Charsets.US_ASCII)
 
     fun ByteArray.asContent(): FileContent = FileContent { inputStream() }

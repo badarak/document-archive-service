@@ -17,6 +17,7 @@ class DocumentFormatTest {
         assertEquals("application/pdf", DocumentFormat.PDF.mediaType)
         assertEquals("audio/mpeg", DocumentFormat.MP3.mediaType)
         assertEquals("audio/wav", DocumentFormat.WAV.mediaType)
+        assertEquals("audio/ogg", DocumentFormat.OGG.mediaType)
     }
 
     @Test

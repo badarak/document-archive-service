@@ -135,7 +135,7 @@ class DocumentFormatPolicyTest {
         val exception = assertThrows(IllegalArgumentException::class.java) { DocumentFormatPolicy.ofExtensions(listOf("pdf", "exe")) }
 
         assertEquals(
-            "Unknown document extension 'exe': supported extensions are pdf, doc, docx, mp3, wav, m4a, eml",
+            "Unknown document extension 'exe': supported extensions are pdf, doc, docx, mp3, wav, m4a, ogg, eml",
             exception.message,
         )
     }

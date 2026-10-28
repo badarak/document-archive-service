@@ -23,6 +23,7 @@ class ContentInspectorAdapterTest {
             DocumentFormat.MP3 to Samples.mp3(),
             DocumentFormat.WAV to Samples.wav(),
             DocumentFormat.M4A to Samples.m4a(),
+            DocumentFormat.OGG to Samples.ogg(),
         )
 
         files.forEach { (format, file) -> assertEquals(ContentInspection.Conforming, inspect(file, format), "$format") }

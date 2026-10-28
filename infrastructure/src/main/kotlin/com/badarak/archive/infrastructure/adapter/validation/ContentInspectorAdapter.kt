@@ -32,6 +32,7 @@ class ContentInspectorAdapter : ContentInspector {
             DocumentFormat.MP3 to Mp3Structure,
             DocumentFormat.WAV to WavStructure,
             DocumentFormat.M4A to M4aStructure,
+            DocumentFormat.OGG to OggStructure,
             DocumentFormat.EML to EmailStructure,
         )
     }

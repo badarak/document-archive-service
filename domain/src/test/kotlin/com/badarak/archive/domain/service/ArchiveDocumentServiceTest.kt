@@ -9,6 +9,7 @@ import com.badarak.archive.domain.model.DocumentStatus
 import com.badarak.archive.domain.model.DocumentTooLargeException
 import com.badarak.archive.domain.model.DocumentType
 import com.badarak.archive.domain.model.EmptyDocumentException
+import com.badarak.archive.domain.model.InvalidDocumentException
 import com.badarak.archive.domain.model.ObjectKey
 import com.badarak.archive.domain.model.TenantId
 import com.badarak.archive.domain.model.UnsupportedDocumentFormatException
@@ -97,7 +98,7 @@ class ArchiveDocumentServiceTest {
 
         @Test
         fun `stores the normalised file name and media type`() {
-            val document = service.archive(command(fileName = "C:\\docs\\invoice.pdf", contentType = "Application/PDF; charset=binary"))
+            val document = service.archive(command(fileName = " invoice.pdf ", contentType = "Application/PDF; charset=binary"))
 
             assertEquals("invoice.pdf", document.file.fileName)
             assertEquals("application/pdf", document.file.contentType)
@@ -110,6 +111,13 @@ class ArchiveDocumentServiceTest {
         @Test
         fun `an unsupported format leaves no trace`() {
             assertThrows(UnsupportedDocumentFormatException::class.java) { service.archive(command(fileName = "setup.exe")) }
+
+            assertNothingWritten()
+        }
+
+        @Test
+        fun `a file name holding a path leaves no trace`() {
+            assertThrows(InvalidDocumentException::class.java) { service.archive(command(fileName = "C:\\docs\\invoice.pdf")) }
 
             assertNothingWritten()
         }

@@ -31,7 +31,10 @@ interface DocumentApi {
         ),
     )
     @ApiResponse(responseCode = "201", description = "Document archived; Location points to the document")
-    @ApiResponse(responseCode = "400", description = "Missing part, malformed metadata, invalid field or empty file")
+    @ApiResponse(
+        responseCode = "400",
+        description = "Missing part, malformed metadata, invalid field, empty file, or file name holding a path or hidden characters",
+    )
     @ApiResponse(responseCode = "403", description = "Token without the documents:write scope, or without tenant or source claim")
     @ApiResponse(responseCode = "413", description = "File larger than 50 MiB")
     @ApiResponse(responseCode = "415", description = "Format not allowed, or declared type or content not matching the extension")

@@ -23,8 +23,8 @@ import java.util.UUID
  * - **Log**: one line per operation, with the operation, the document, the HTTP status, the outcome, the error code and
  * the duration as key-value pairs. The other lines of the request share its `traceId` with it. Nothing else from the
  * request is logged, never the content, the token, the file name nor the business reference; the tenant only when
- * [OperationLogProperties.includeTenant] allows it. The line is an ERROR for a server error, a WARN for the client errors
- * that point to a caller to fix (401, 403, 413, 415), and an INFO otherwise.
+ * [OperationLogProperties.includeTenant] allows it. The line is an ERROR for a server error, a WARN for an authenticated
+ * caller refused by its scopes (403), and an INFO otherwise: the other client errors are ordinary answers of the API.
  * - **Metrics**: an observation named after the operation (`archive.upload`, `archive.download`…), hence a timer that
  * counts and times the operations, tagged with their `outcome` and `error.code` only: never an identifier.
  */
@@ -82,7 +82,7 @@ class ApiOperationFilter(private val properties: OperationLogProperties, private
 
     private fun level(status: Int, outcome: OperationOutcome): Level = when {
         outcome == OperationOutcome.SERVER_ERROR -> Level.ERROR
-        HttpStatus.resolve(status) in CALLER_TO_FIX -> Level.WARN
+        status == HttpStatus.FORBIDDEN.value() -> Level.WARN
         else -> Level.INFO
     }
 
@@ -101,12 +101,6 @@ class ApiOperationFilter(private val properties: OperationLogProperties, private
 
         private const val INTERNAL_ERROR = "internal-error"
         private const val NONE = "none"
-        private val CALLER_TO_FIX = setOf(
-            HttpStatus.UNAUTHORIZED,
-            HttpStatus.FORBIDDEN,
-            HttpStatus.CONTENT_TOO_LARGE,
-            HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-        )
     }
 }
 

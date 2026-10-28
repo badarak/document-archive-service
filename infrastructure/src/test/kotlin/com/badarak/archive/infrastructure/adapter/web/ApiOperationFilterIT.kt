@@ -93,11 +93,11 @@ class ApiOperationFilterIT {
     }
 
     @Test
-    fun `a refused upload is logged as a warning with the code of its error, never with the name of the file`() {
+    fun `a refused upload is logged with the code of its error, never with the name of the file`() {
         upload(file("salaries-2026.txt", "text/plain", "secret".toByteArray()))
 
         val line = lines.list.single()
-        assertEquals(Level.WARN, line.level)
+        assertEquals(Level.INFO, line.level)
         assertEquals(415, line.value("status"))
         assertEquals("client-error", line.value("outcome"))
         assertEquals("unsupported-format", line.value("errorCode"))
@@ -106,11 +106,11 @@ class ApiOperationFilterIT {
     }
 
     @Test
-    fun `a request refused by the security is logged as a warning too`() {
+    fun `a request without token is logged as an info, as anyone can send one`() {
         mockMvc.get(DOCUMENTS)
 
         val line = lines.list.single()
-        assertEquals(Level.WARN, line.level)
+        assertEquals(Level.INFO, line.level)
         assertEquals("SEARCH", line.value("operation"))
         assertEquals(401, line.value("status"))
         assertEquals("unauthenticated", line.value("errorCode"))

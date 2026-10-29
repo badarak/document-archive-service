@@ -7,6 +7,10 @@ server:
 spring:
   application:
     name: document-archive-service
+  config:
+    # Secrets may also come as files, one per variable named after it (ARCHIVE_DB_PASSWORD…), as Vault Agent renders
+    # them: they stay out of the environment of the process. An environment variable still wins over its file.
+    import: optional:configtree:${ARCHIVE_SECRETS_DIR:/run/secrets}/
   lifecycle:
     # On shutdown, requests in progress are finished first. The wait exceeds the storage api-call-timeout, so that an
     # upload is not cut and its archiving left pending. The orchestrator must give at least as long before killing the

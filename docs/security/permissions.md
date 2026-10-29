@@ -39,3 +39,30 @@ SELECT tablename, tableowner FROM pg_tables WHERE schemaname = 'archive';
 SELECT table_name, string_agg(privilege_type, ', ') FROM information_schema.role_table_grants
 WHERE grantee = 'archive_app' GROUP BY table_name;
 ```
+
+## Object storage
+
+The application only puts, gets and deletes objects, under the `documents/` prefix of one bucket: it never lists the
+bucket, nor creates one.
+
+| Provider | Account of the application |
+|---|---|
+| **Cloudflare R2** (production) | An API token with the **Object Read & Write** permission, **limited to the archive bucket**, one per environment. R2 cannot grant deletion apart from writing: this is the least it allows |
+| AWS S3 | No keys: a role (IRSA on EKS, instance role) found by the standard AWS chain, with the policy below |
+| MinIO (local) | `ARCHIVE_S3_ACCESS_KEY`, created by `docker/minio/setup.sh` with the policy below. The root account (`ARCHIVE_S3_ROOT_*`) only serves the console and the setup |
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": ["arn:aws:s3:::<bucket>/documents/*"]
+    }
+  ]
+}
+```
+
+The bucket itself stays private (no public access, no public URL), and is created outside the application: by the
+platform in production, by the setup container locally.

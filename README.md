@@ -22,14 +22,18 @@ cp .env.example .env
 
 Then fill in the empty values in `.env`: the usernames and passwords of the three database accounts
 (the superuser of the container, the migrator and the application, three different usernames), the
-object storage access key and secret key (at least 8 characters), the Keycloak admin username and
-password, the secrets of the two calling services and the secret of the Prometheus scraper. Any value
-works locally; the same file configures both the containers and the application. `.env` is ignored
-by git.
+MinIO root account and the object storage account of the application (two different access keys,
+secrets of at least 8 characters), the Keycloak admin username and password, the secrets of the two
+calling services and the secret of the Prometheus scraper. Any value works locally; the same file
+configures both the containers and the application. `.env` is ignored by git.
 
-An existing `.env` must also get the `ARCHIVE_DB_ADMIN_*` and `ARCHIVE_DB_MIGRATOR_*` variables, and
-an existing database volume must be recreated (`docker compose down -v`, which erases the local
-data), so that the init script creates the accounts.
+An existing `.env` must also get the new variables of `.env.example`:
+- `ARCHIVE_DB_ADMIN_*` and `ARCHIVE_DB_MIGRATOR_*`; the existing database volume must then be
+  recreated (`docker compose down -v`, which erases the local data), so that the init script creates
+  the accounts;
+- `ARCHIVE_S3_ROOT_USER` and `ARCHIVE_S3_ROOT_PASSWORD`, set to the former `ARCHIVE_S3_ACCESS_KEY`
+  and `ARCHIVE_S3_SECRET_KEY`, which were the MinIO root account; then give the application an
+  access key and a secret key of its own.
 
 An existing `.env` must also get the `ARCHIVE_KEYCLOAK_*` variables of `.env.example`: Docker Compose
 checks the variables of every service, so without them it starts none of the containers.
@@ -43,18 +47,15 @@ docker compose up -d
 - PostgreSQL listens on port 5432. On its first start, an init script creates the migrator and
   application accounts, and the `archive` schema owned by the migrator.
 - MinIO serves the S3 API on port 9000 and a web console on <http://localhost:9001>. Sign in to the
-  console with the access key and secret key from `.env`.
+  console with `ARCHIVE_S3_ROOT_USER` and `ARCHIVE_S3_ROOT_PASSWORD`. At each start, the
+  `minio-setup` container creates the bucket (`ARCHIVE_S3_BUCKET`) if it is missing, and the account
+  of the application (`ARCHIVE_S3_ACCESS_KEY`), which may only put, get and delete the objects under
+  `documents/`.
 - Keycloak, the local authorization server, listens on port 8180, with its admin console on
   <http://localhost:8180>. It imports the `archive` realm from `docker/keycloak` at each start and
   keeps nothing: changes made in the console are lost on restart.
 
-### 3. Create the bucket
-
-The bucket is not created automatically. Create it once per MinIO volume, from the MinIO console
-at <http://localhost:9001>. Its name must match `ARCHIVE_S3_BUCKET` in `.env` (`archive-documents`
-by default).
-
-### 4. Start the application
+### 3. Start the application
 
 ```bash
 mvn spring-boot:run
@@ -88,7 +89,8 @@ one is missing.
 | `ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET`, `ARCHIVE_KEYCLOAK_GLOBEX_CLIENT_SECRET` | Secrets of the two calling services declared in the local realm |
 | `ARCHIVE_KEYCLOAK_PROMETHEUS_CLIENT_SECRET` | Secret of the `prometheus` client of the local realm, whose tokens carry only the `metrics:read` scope |
 | `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application. Without endpoint, AWS S3; the region is `auto` by default, as R2 expects |
-| `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account. Leave both empty to use the standard AWS chain (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, a profile, a web identity or an instance role); the application does not start without credentials |
+| `ARCHIVE_S3_ROOT_USER`, `ARCHIVE_S3_ROOT_PASSWORD` | Root account of the MinIO container, for its console and its setup only |
+| `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials of the application; locally, the setup of the MinIO container creates this account (see [permissions](docs/security/permissions.md)). Leave both empty to use the standard AWS chain (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, a profile, a web identity or an instance role); the application does not start without credentials |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
 | `MANAGEMENT_SERVER_PORT` | Optional. Port of the actuator endpoints (health probes and Prometheus), the application port by default; a separate port keeps them off the public network |
 | `ARCHIVE_OTLP_URL` | Optional. OTLP endpoint of the `observability` profile (`http://localhost:4318` by default) |
@@ -352,9 +354,9 @@ Nothing is tested automatically against a real PostgreSQL or MinIO.
 
 ## Troubleshooting
 
-- **The `archive` schema is missing**: the PostgreSQL init script only runs on an empty data volume.
-  `docker compose down -v` deletes the volumes, so the next start replays it. This also erases the
-  local data and the bucket.
+- **The `archive` schema or the database accounts are missing**: the PostgreSQL init script only runs
+  on an empty data volume. `docker compose down -v` deletes the volumes, so the next start replays
+  it. This also erases the local data and the bucket, which the MinIO setup recreates.
 - **The container name `miniostorage` is already in use**: the name is fixed, so two copies of the
   project cannot run on the same machine at the same time.
 

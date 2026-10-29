@@ -78,11 +78,14 @@ archive:
     batch-size: ${ARCHIVE_RECONCILIATION_BATCH_SIZE:100}
   storage:
     s3:
-      endpoint: ${ARCHIVE_S3_ENDPOINT}
-      region: ${ARCHIVE_S3_REGION}
+      # Without endpoint, the client targets AWS S3; R2 and MinIO need theirs. R2 expects the auto region.
+      endpoint: ${ARCHIVE_S3_ENDPOINT:}
+      region: ${ARCHIVE_S3_REGION:auto}
       bucket: ${ARCHIVE_S3_BUCKET}
-      access-key: ${ARCHIVE_S3_ACCESS_KEY}
-      secret-key: ${ARCHIVE_S3_SECRET_KEY}
+      # Both keys, or neither: the standard AWS chain then finds the credentials. Either way, the application does not
+      # start without credentials.
+      access-key: ${ARCHIVE_S3_ACCESS_KEY:}
+      secret-key: ${ARCHIVE_S3_SECRET_KEY:}
       path-style-access: ${ARCHIVE_S3_PATH_STYLE_ACCESS:true}
       api-call-timeout: ${ARCHIVE_S3_API_CALL_TIMEOUT:2m}
 

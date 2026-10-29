@@ -28,8 +28,7 @@ class RequiredSettingsTest {
             "spring.datasource.url", "spring.datasource.username", "spring.datasource.password",
             "spring.security.oauth2.resourceserver.jwt.issuer-uri", "spring.security.oauth2.resourceserver.jwt.jwk-set-uri",
             "spring.security.oauth2.resourceserver.jwt.audiences", "archive.storage.s3.region", "archive.storage.s3.bucket",
-            "archive.storage.s3.access-key", "archive.storage.s3.secret-key", "archive.security.claims.tenant",
-            "archive.security.claims.source",
+            "archive.security.claims.tenant", "archive.security.claims.source",
         ],
     )
     fun `an empty required setting stops the startup, naming the setting`(name: String) {
@@ -48,6 +47,26 @@ class RequiredSettingsTest {
         runner.withPropertyValues("spring.security.oauth2.resourceserver.jwt.audiences=document-archive-service, ").run { context ->
             assertTrue(messages(context.startupFailure).contains("must not hold a blank audience"))
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["archive.storage.s3.access-key", "archive.storage.s3.secret-key"])
+    fun `a storage key without the other one stops the startup`(name: String) {
+        runner.withPropertyValues("$name=").run { context ->
+            assertTrue(messages(context.startupFailure).contains("access-key and secret-key must be both set"))
+        }
+    }
+
+    @Test
+    fun `without storage keys nor endpoint, the settings leave the credentials and the endpoint to the AWS defaults`() {
+        runner.withPropertyValues("archive.storage.s3.access-key=", "archive.storage.s3.secret-key=", "archive.storage.s3.endpoint=")
+            .run { context ->
+                val storage = context.getBean(S3StorageProperties::class.java)
+
+                assertNull(storage.accessKey)
+                assertNull(storage.secretKey)
+                assertNull(storage.endpoint)
+            }
     }
 
     @Test

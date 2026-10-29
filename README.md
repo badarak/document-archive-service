@@ -20,10 +20,16 @@ Run every command from the project root.
 cp .env.example .env
 ```
 
-Then fill in the nine empty values in `.env`: the database username and password, the object
-storage access key and secret key (at least 8 characters), the Keycloak admin username and password,
-the secrets of the two calling services and the secret of the Prometheus scraper. Any value works locally; the same file configures both
-the containers and the application. `.env` is ignored by git.
+Then fill in the empty values in `.env`: the usernames and passwords of the three database accounts
+(the superuser of the container, the migrator and the application, three different usernames), the
+object storage access key and secret key (at least 8 characters), the Keycloak admin username and
+password, the secrets of the two calling services and the secret of the Prometheus scraper. Any value
+works locally; the same file configures both the containers and the application. `.env` is ignored
+by git.
+
+An existing `.env` must also get the `ARCHIVE_DB_ADMIN_*` and `ARCHIVE_DB_MIGRATOR_*` variables, and
+an existing database volume must be recreated (`docker compose down -v`, which erases the local
+data), so that the init script creates the accounts.
 
 An existing `.env` must also get the `ARCHIVE_KEYCLOAK_*` variables of `.env.example`: Docker Compose
 checks the variables of every service, so without them it starts none of the containers.
@@ -34,7 +40,8 @@ checks the variables of every service, so without them it starts none of the con
 docker compose up -d
 ```
 
-- PostgreSQL listens on port 5432. On its first start, an init script creates the `archive` schema.
+- PostgreSQL listens on port 5432. On its first start, an init script creates the migrator and
+  application accounts, and the `archive` schema owned by the migrator.
 - MinIO serves the S3 API on port 9000 and a web console on <http://localhost:9001>. Sign in to the
   console with the access key and secret key from `.env`.
 - Keycloak, the local authorization server, listens on port 8180, with its admin console on
@@ -71,7 +78,10 @@ one is missing.
 | Variables | Purpose |
 |---|---|
 | `ARCHIVE_DB_NAME`, `ARCHIVE_DB_PORT` | Database name and published port of the PostgreSQL container |
-| `ARCHIVE_DB_USERNAME`, `ARCHIVE_DB_PASSWORD` | Database credentials, shared by the container and the application |
+| `ARCHIVE_DB_ADMIN_USERNAME`, `ARCHIVE_DB_ADMIN_PASSWORD` | Superuser of the PostgreSQL container, used only by its init script |
+| `ARCHIVE_DB_MIGRATOR_USERNAME`, `ARCHIVE_DB_MIGRATOR_PASSWORD` | Account of the Liquibase migrations, owner of the `archive` schema; required while the migrations run at startup |
+| `ARCHIVE_DB_USERNAME`, `ARCHIVE_DB_PASSWORD` | Account of the application, which only reads and writes rows (see [permissions](docs/security/permissions.md)) |
+| `ARCHIVE_DB_MIGRATIONS_ENABLED` | Optional. Runs the migrations at startup (`true` by default); set `false` when a separate job runs them, the migrator account is then not needed |
 | `ARCHIVE_DB_URL` | JDBC URL used by the application; keep it consistent with the name and port above |
 | `ARCHIVE_S3_PORT`, `ARCHIVE_S3_CONSOLE_PORT` | Published ports of the MinIO container |
 | `ARCHIVE_KEYCLOAK_PORT`, `ARCHIVE_KEYCLOAK_ADMIN_USERNAME`, `ARCHIVE_KEYCLOAK_ADMIN_PASSWORD` | Published port and admin account of the Keycloak container |

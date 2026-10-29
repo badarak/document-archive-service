@@ -14,13 +14,22 @@ import org.springframework.validation.annotation.Validated
  * for any other service. Only emptiness is checked, so that a failure never prints a secret value.
  */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(DataSourceSettings::class, TokenSettings::class)
+@EnableConfigurationProperties(DataSourceSettings::class, MigrationSettings::class, TokenSettings::class)
 class RequiredSettingsConfiguration
 
 /** The database connection: ARCHIVE_DB_URL, ARCHIVE_DB_USERNAME and ARCHIVE_DB_PASSWORD. */
 @Validated
 @ConfigurationProperties("spring.datasource")
 class DataSourceSettings(@field:NotBlank val url: String?, @field:NotBlank val username: String?, @field:NotBlank val password: String?)
+
+/** The account of the migrations, required while they run at startup: ARCHIVE_DB_MIGRATOR_USERNAME and ARCHIVE_DB_MIGRATOR_PASSWORD. */
+@Validated
+@ConfigurationProperties("spring.liquibase")
+class MigrationSettings(val enabled: Boolean = true, val user: String?, val password: String?) {
+    @get:AssertTrue(message = "the migrations need their own account: set ARCHIVE_DB_MIGRATOR_USERNAME and ARCHIVE_DB_MIGRATOR_PASSWORD")
+    val accountSet: Boolean
+        get() = !enabled || (!user.isNullOrBlank() && !password.isNullOrBlank())
+}
 
 /** The authorization server: ARCHIVE_JWT_ISSUER, ARCHIVE_JWT_JWKS_URI and ARCHIVE_JWT_AUDIENCE. */
 @Validated

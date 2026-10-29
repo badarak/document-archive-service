@@ -19,7 +19,7 @@ some crash reports. The application reads each file of `ARCHIVE_SECRETS_DIR` as 
 | Variable | Secret | Rotation |
 |---|---|---|
 | `ARCHIVE_DB_PASSWORD` | Password of the `archive_app` PostgreSQL role (see [permissions](permissions.md)) | Set a new password on the role, update Vault, restart the instances; the old password stops working at once, so rotate during a quiet period, or create a second role and switch to it |
-| `ARCHIVE_DB_MIGRATOR_PASSWORD` | Password of the `archive_migrator` role, read by the migration job only | As above, between two releases |
+| `ARCHIVE_DB_MIGRATOR_PASSWORD` | Password of the `archive_migrator` role. Read at startup while the migrations run there; once a separate job runs them (`ARCHIVE_DB_MIGRATIONS_ENABLED=false`), only that job reads it | As above, between two releases |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | R2 API token limited to the archive bucket | Create a second token, update Vault, restart the instances, then revoke the first token |
 
 The database username and URL, the bucket, the endpoint and the authorization server URIs are configuration, not
@@ -30,6 +30,7 @@ secrets: they may stay plain environment variables.
 ```
 secret/data/document-archive-service/<environment>
     ARCHIVE_DB_PASSWORD
+    ARCHIVE_DB_MIGRATOR_PASSWORD      (while the migrations run at startup)
     ARCHIVE_S3_ACCESS_KEY
     ARCHIVE_S3_SECRET_KEY
 secret/data/document-archive-service-migrations/<environment>
@@ -53,8 +54,9 @@ vault write auth/kubernetes/role/document-archive-service-<environment> \
   ttl=1h
 ```
 
-The migration job has its own service account, role and policy on the `-migrations` path: the running application
-never sees the migrator password.
+While the migrations run at startup, the application also reads `ARCHIVE_DB_MIGRATOR_PASSWORD`, from its own path.
+Once a migration job runs them, that job gets its own service account, role and policy on the `-migrations` path, and
+the running application no longer sees the migrator password.
 
 ## Rendering the files
 

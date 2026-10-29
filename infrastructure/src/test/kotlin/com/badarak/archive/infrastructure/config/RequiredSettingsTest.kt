@@ -69,6 +69,21 @@ class RequiredSettingsTest {
             }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["spring.liquibase.user", "spring.liquibase.password"])
+    fun `migrations at startup need their own account`(name: String) {
+        runner.withPropertyValues("$name=").run { context ->
+            assertTrue(messages(context.startupFailure).contains("the migrations need their own account"))
+        }
+    }
+
+    @Test
+    fun `migrations run by a separate job need no account in the application`() {
+        runner.withPropertyValues("spring.liquibase.enabled=false", "spring.liquibase.user=", "spring.liquibase.password=").run { context ->
+            assertNull(context.startupFailure)
+        }
+    }
+
     @Test
     fun `a failure never prints the value of a secret`() {
         runner.withPropertyValues("spring.datasource.url=").run { context ->
@@ -101,6 +116,8 @@ class RequiredSettingsTest {
             "spring.datasource.url" to "jdbc:postgresql://db/archive",
             "spring.datasource.username" to "archive_app",
             "spring.datasource.password" to SECRET,
+            "spring.liquibase.user" to "archive_migrator",
+            "spring.liquibase.password" to SECRET,
             "spring.security.oauth2.resourceserver.jwt.issuer-uri" to "https://auth.test",
             "spring.security.oauth2.resourceserver.jwt.jwk-set-uri" to "https://auth.test/jwks",
             "spring.security.oauth2.resourceserver.jwt.audiences" to "document-archive-service",

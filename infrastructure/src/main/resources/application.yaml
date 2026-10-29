@@ -33,6 +33,11 @@ spring:
     # The archive schema is provisioned outside the application and must exist before startup:
     # Liquibase stores its tracking tables in it.
     liquibase-schema: archive
+    # The migrations run with an account of their own, owner of the schema, while the application only reads and writes
+    # rows (docs/security/permissions.md). Turn them off when a separate job runs them.
+    enabled: ${ARCHIVE_DB_MIGRATIONS_ENABLED:true}
+    user: ${ARCHIVE_DB_MIGRATOR_USERNAME:}
+    password: ${ARCHIVE_DB_MIGRATOR_PASSWORD:}
   jpa:
     open-in-view: false
     hibernate:

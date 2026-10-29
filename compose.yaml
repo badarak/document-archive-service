@@ -4,8 +4,13 @@ services:
     image: postgres:17
     environment:
       POSTGRES_DB: ${ARCHIVE_DB_NAME:?set it in .env}
-      POSTGRES_USER: ${ARCHIVE_DB_USERNAME:?set it in .env}
-      POSTGRES_PASSWORD: ${ARCHIVE_DB_PASSWORD:?set it in .env}
+      # Superuser of the container, used only by the init script: neither the application nor Liquibase connects with it.
+      POSTGRES_USER: ${ARCHIVE_DB_ADMIN_USERNAME:?set it in .env}
+      POSTGRES_PASSWORD: ${ARCHIVE_DB_ADMIN_PASSWORD:?set it in .env}
+      ARCHIVE_DB_MIGRATOR_USERNAME: ${ARCHIVE_DB_MIGRATOR_USERNAME:?set it in .env}
+      ARCHIVE_DB_MIGRATOR_PASSWORD: ${ARCHIVE_DB_MIGRATOR_PASSWORD:?set it in .env}
+      ARCHIVE_DB_USERNAME: ${ARCHIVE_DB_USERNAME:?set it in .env}
+      ARCHIVE_DB_PASSWORD: ${ARCHIVE_DB_PASSWORD:?set it in .env}
     ports:
       - "${ARCHIVE_DB_PORT:?set it in .env}:5432"
     volumes:

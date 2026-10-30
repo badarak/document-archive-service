@@ -4,8 +4,13 @@ services:
     image: postgres:17
     environment:
       POSTGRES_DB: ${ARCHIVE_DB_NAME:?set it in .env}
-      POSTGRES_USER: ${ARCHIVE_DB_USERNAME:?set it in .env}
-      POSTGRES_PASSWORD: ${ARCHIVE_DB_PASSWORD:?set it in .env}
+      # Superuser of the container, used only by the init script: neither the application nor Liquibase connects with it.
+      POSTGRES_USER: ${ARCHIVE_DB_ADMIN_USERNAME:?set it in .env}
+      POSTGRES_PASSWORD: ${ARCHIVE_DB_ADMIN_PASSWORD:?set it in .env}
+      ARCHIVE_DB_MIGRATOR_USERNAME: ${ARCHIVE_DB_MIGRATOR_USERNAME:?set it in .env}
+      ARCHIVE_DB_MIGRATOR_PASSWORD: ${ARCHIVE_DB_MIGRATOR_PASSWORD:?set it in .env}
+      ARCHIVE_DB_USERNAME: ${ARCHIVE_DB_USERNAME:?set it in .env}
+      ARCHIVE_DB_PASSWORD: ${ARCHIVE_DB_PASSWORD:?set it in .env}
     ports:
       - "${ARCHIVE_DB_PORT:?set it in .env}:5432"
     volumes:
@@ -20,13 +25,29 @@ services:
     container_name: miniostorage
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${ARCHIVE_S3_ACCESS_KEY:?set it in .env}
-      MINIO_ROOT_PASSWORD: ${ARCHIVE_S3_SECRET_KEY:?set it in .env}
+      # Root account of the container, for its console and the setup below: the application uses an account of its own.
+      MINIO_ROOT_USER: ${ARCHIVE_S3_ROOT_USER:?set it in .env}
+      MINIO_ROOT_PASSWORD: ${ARCHIVE_S3_ROOT_PASSWORD:?set it in .env}
     ports:
       - "${ARCHIVE_S3_PORT:?set it in .env}:9000"
       - "${ARCHIVE_S3_CONSOLE_PORT:?set it in .env}:9001"
     volumes:
       - miniodata:/data
+
+  # Creates the bucket and the account of the application, limited to the objects under documents/, then exits.
+  minio-setup:
+    image: docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    depends_on:
+      - minio
+    entrypoint: /setup.sh
+    environment:
+      MINIO_ROOT_USER: ${ARCHIVE_S3_ROOT_USER:?set it in .env}
+      MINIO_ROOT_PASSWORD: ${ARCHIVE_S3_ROOT_PASSWORD:?set it in .env}
+      ARCHIVE_S3_BUCKET: ${ARCHIVE_S3_BUCKET:?set it in .env}
+      ARCHIVE_S3_ACCESS_KEY: ${ARCHIVE_S3_ACCESS_KEY:?set it in .env}
+      ARCHIVE_S3_SECRET_KEY: ${ARCHIVE_S3_SECRET_KEY:?set it in .env}
+    volumes:
+      - ./docker/minio/setup.sh:/setup.sh:ro
 
   # Local authorization server: issues the access tokens of two calling services, one per tenant. The realm is
   # imported at each start from docker/keycloak; nothing is persisted, so changes made in the console are lost.

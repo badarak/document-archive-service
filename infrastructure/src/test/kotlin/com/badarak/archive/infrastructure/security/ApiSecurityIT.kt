@@ -4,6 +4,7 @@ import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -191,10 +192,22 @@ class ApiSecurityIT {
 
     @Test
     fun `a path outside the document API is closed even with every scope`() {
-        val token = TestAuthorizationServer.token(scope = "$READ $WRITE $DELETE")
+        val token = TestAuthorizationServer.token(scope = "$READ $WRITE $DELETE $METRICS")
 
         mockMvc.get("/api/v1/other") { bearer(token) }.andExpect { status { isForbidden() } }
-        mockMvc.get("/actuator/env") { bearer(token) }.andExpect { status { isForbidden() } }
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "/actuator", "/actuator/env", "/actuator/configprops", "/actuator/heapdump", "/actuator/threaddump",
+            "/actuator/loggers", "/actuator/beans", "/actuator/mappings", "/actuator/info", "/actuator/shutdown",
+        ],
+    )
+    fun `the sensitive actuator endpoints are closed even with every scope`(path: String) {
+        val token = TestAuthorizationServer.token(scope = "$READ $WRITE $DELETE $METRICS")
+
+        mockMvc.get(path) { bearer(token) }.andExpect { status { isForbidden() } }
     }
 
     @Test
@@ -220,6 +233,7 @@ class ApiSecurityIT {
         private const val READ = "documents:read"
         private const val WRITE = "documents:write"
         private const val DELETE = "documents:delete"
+        private const val METRICS = "metrics:read"
 
         @JvmStatic
         @DynamicPropertySource

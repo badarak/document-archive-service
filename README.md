@@ -20,10 +20,20 @@ Run every command from the project root.
 cp .env.example .env
 ```
 
-Then fill in the nine empty values in `.env`: the database username and password, the object
-storage access key and secret key (at least 8 characters), the Keycloak admin username and password,
-the secrets of the two calling services and the secret of the Prometheus scraper. Any value works locally; the same file configures both
-the containers and the application. `.env` is ignored by git.
+Then fill in the empty values in `.env`: the usernames and passwords of the three database accounts
+(the superuser of the container, the migrator and the application, three different usernames), the
+MinIO root account and the object storage account of the application (two different access keys,
+secrets of at least 8 characters), the Keycloak admin username and password, the secrets of the two
+calling services and the secret of the Prometheus scraper. Any value works locally; the same file
+configures both the containers and the application. `.env` is ignored by git.
+
+An existing `.env` must also get the new variables of `.env.example`:
+- `ARCHIVE_DB_ADMIN_*` and `ARCHIVE_DB_MIGRATOR_*`; the existing database volume must then be
+  recreated (`docker compose down -v`, which erases the local data), so that the init script creates
+  the accounts;
+- `ARCHIVE_S3_ROOT_USER` and `ARCHIVE_S3_ROOT_PASSWORD`, set to the former `ARCHIVE_S3_ACCESS_KEY`
+  and `ARCHIVE_S3_SECRET_KEY`, which were the MinIO root account; then give the application an
+  access key and a secret key of its own.
 
 An existing `.env` must also get the `ARCHIVE_KEYCLOAK_*` variables of `.env.example`: Docker Compose
 checks the variables of every service, so without them it starts none of the containers.
@@ -34,20 +44,18 @@ checks the variables of every service, so without them it starts none of the con
 docker compose up -d
 ```
 
-- PostgreSQL listens on port 5432. On its first start, an init script creates the `archive` schema.
+- PostgreSQL listens on port 5432. On its first start, an init script creates the migrator and
+  application accounts, and the `archive` schema owned by the migrator.
 - MinIO serves the S3 API on port 9000 and a web console on <http://localhost:9001>. Sign in to the
-  console with the access key and secret key from `.env`.
+  console with `ARCHIVE_S3_ROOT_USER` and `ARCHIVE_S3_ROOT_PASSWORD`. At each start, the
+  `minio-setup` container creates the bucket (`ARCHIVE_S3_BUCKET`) if it is missing, and the account
+  of the application (`ARCHIVE_S3_ACCESS_KEY`), which may only put, get and delete the objects under
+  `documents/`.
 - Keycloak, the local authorization server, listens on port 8180, with its admin console on
   <http://localhost:8180>. It imports the `archive` realm from `docker/keycloak` at each start and
   keeps nothing: changes made in the console are lost on restart.
 
-### 3. Create the bucket
-
-The bucket is not created automatically. Create it once per MinIO volume, from the MinIO console
-at <http://localhost:9001>. Its name must match `ARCHIVE_S3_BUCKET` in `.env` (`archive-documents`
-by default).
-
-### 4. Start the application
+### 3. Start the application
 
 ```bash
 mvn spring-boot:run
@@ -71,14 +79,18 @@ one is missing.
 | Variables | Purpose |
 |---|---|
 | `ARCHIVE_DB_NAME`, `ARCHIVE_DB_PORT` | Database name and published port of the PostgreSQL container |
-| `ARCHIVE_DB_USERNAME`, `ARCHIVE_DB_PASSWORD` | Database credentials, shared by the container and the application |
+| `ARCHIVE_DB_ADMIN_USERNAME`, `ARCHIVE_DB_ADMIN_PASSWORD` | Superuser of the PostgreSQL container, used only by its init script |
+| `ARCHIVE_DB_MIGRATOR_USERNAME`, `ARCHIVE_DB_MIGRATOR_PASSWORD` | Account of the Liquibase migrations, owner of the `archive` schema; required while the migrations run at startup |
+| `ARCHIVE_DB_USERNAME`, `ARCHIVE_DB_PASSWORD` | Account of the application, which only reads and writes rows (see [permissions](docs/security/permissions.md)) |
+| `ARCHIVE_DB_MIGRATIONS_ENABLED` | Optional. Runs the migrations at startup (`true` by default); set `false` when a separate job runs them, the migrator account is then not needed |
 | `ARCHIVE_DB_URL` | JDBC URL used by the application; keep it consistent with the name and port above |
 | `ARCHIVE_S3_PORT`, `ARCHIVE_S3_CONSOLE_PORT` | Published ports of the MinIO container |
 | `ARCHIVE_KEYCLOAK_PORT`, `ARCHIVE_KEYCLOAK_ADMIN_USERNAME`, `ARCHIVE_KEYCLOAK_ADMIN_PASSWORD` | Published port and admin account of the Keycloak container |
 | `ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET`, `ARCHIVE_KEYCLOAK_GLOBEX_CLIENT_SECRET` | Secrets of the two calling services declared in the local realm |
 | `ARCHIVE_KEYCLOAK_PROMETHEUS_CLIENT_SECRET` | Secret of the `prometheus` client of the local realm, whose tokens carry only the `metrics:read` scope |
-| `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application |
-| `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials; locally they are also the MinIO root account |
+| `ARCHIVE_S3_ENDPOINT`, `ARCHIVE_S3_REGION`, `ARCHIVE_S3_BUCKET` | Object storage targeted by the application. Without endpoint, AWS S3; the region is `auto` by default, as R2 expects |
+| `ARCHIVE_S3_ROOT_USER`, `ARCHIVE_S3_ROOT_PASSWORD` | Root account of the MinIO container, for its console and its setup only |
+| `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials of the application; locally, the setup of the MinIO container creates this account (see [permissions](docs/security/permissions.md)). Leave both empty to use the standard AWS chain (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, a profile, a web identity or an instance role); the application does not start without credentials |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
 | `MANAGEMENT_SERVER_PORT` | Optional. Port of the actuator endpoints (health probes and Prometheus), the application port by default; a separate port keeps them off the public network |
 | `ARCHIVE_OTLP_URL` | Optional. OTLP endpoint of the `observability` profile (`http://localhost:4318` by default) |
@@ -97,6 +109,7 @@ one is missing.
 | `ARCHIVE_MAX_FILE_SIZE` | Optional. Maximum size of an archived file, in bytes or with a unit such as `20MB` (`52428800`, 50 MiB, by default). Above 50 MiB, `SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE` and `SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE` must be raised too, or the application does not start |
 | `ARCHIVE_REJECT_MIME_MISMATCH` | Optional. Whether a declared content type that does not match the format of the file is rejected (`true` by default); when `false`, the media type of the format is stored instead. A content that does not match its extension is always rejected |
 | `SPRING_SERVLET_MULTIPART_LOCATION` | Optional. Directory of the temporary files the uploads are written to, before their validation and their upload; the temporary directory of the server by default. Point it to a directory only the application can read. Each file is removed once its request is answered |
+| `ARCHIVE_SECRETS_DIR` | Optional. Directory of secret files, one per variable named after it (`ARCHIVE_DB_PASSWORD`…), as Vault Agent renders them (`/run/secrets` by default); an environment variable of the same name wins. See [secrets](docs/security/secrets.md) |
 
 ## The `local` profile
 
@@ -325,6 +338,19 @@ the `acme` tenant, whose client id and secret it reads from `.env`. To act for `
 with `globex-billing-service` and its secret in the same dialog, or paste any token in the
 `bearer-jwt` section.
 
+
+### Secrets, permissions and vulnerabilities
+
+- [Secrets](docs/security/secrets.md): none in the repository, nor a default value for one; HashiCorp Vault
+  in production, rendered as files read through `ARCHIVE_SECRETS_DIR`; how to rotate each one. The
+  application does not start when a required setting is missing or empty.
+- [Permissions](docs/security/permissions.md): the database accounts of the migrations and of the
+  application, the storage account limited to the objects of the archive, and how to create them.
+- [Vulnerability policy](docs/security/vulnerability-policy.md): the dependency scan of the CI, the time to
+  fix by severity, and how a vulnerability may be accepted.
+- The `local` profile is for a developer machine only: it publishes the Swagger UI with the secret of a
+  local Keycloak client.
+
 ## Tests
 
 ```bash
@@ -341,9 +367,9 @@ Nothing is tested automatically against a real PostgreSQL or MinIO.
 
 ## Troubleshooting
 
-- **The `archive` schema is missing**: the PostgreSQL init script only runs on an empty data volume.
-  `docker compose down -v` deletes the volumes, so the next start replays it. This also erases the
-  local data and the bucket.
+- **The `archive` schema or the database accounts are missing**: the PostgreSQL init script only runs
+  on an empty data volume. `docker compose down -v` deletes the volumes, so the next start replays
+  it. This also erases the local data and the bucket, which the MinIO setup recreates.
 - **The container name `miniostorage` is already in use**: the name is fixed, so two copies of the
   project cannot run on the same machine at the same time.
 

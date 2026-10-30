@@ -41,3 +41,4 @@ springdoc:
     oauth:
       client-id: billing-service
       client-secret: ${ARCHIVE_KEYCLOAK_ACME_CLIENT_SECRET}
+      scopes: documents:read,documents:write,documents:delete

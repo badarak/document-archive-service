@@ -1,0 +1,27 @@
+# Weekly updates of the Maven dependencies and of the GitHub Actions of the CI, grouped to keep the pull requests few.
+# Security updates, for a known vulnerability, are opened at once whatever this schedule.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      spring-boot:
+        patterns:
+          - "org.springframework.boot*"
+      dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "org.springframework.boot*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"

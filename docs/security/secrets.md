@@ -81,7 +81,8 @@ The secrets are read at startup: after a rotation, restart the instances (a roll
 
 ## What must never happen
 
-- A secret in Git, in an image or in a log: `.env` is ignored, `.dockerignore` excludes it, and neither the logs, the
+- A secret in Git, in an image or in a log: `.env` is ignored by Git and must be excluded from any image build
+  context (`.dockerignore`), and neither the logs, the
   traces nor the error answers carry credentials (a test checks it with sentinel values).
 - A default value for a secret in `application.yaml`.
 - The `local` profile outside a developer machine: it publishes the Swagger UI with the secret of a local Keycloak

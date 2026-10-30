@@ -338,6 +338,19 @@ the `acme` tenant, whose client id and secret it reads from `.env`. To act for `
 with `globex-billing-service` and its secret in the same dialog, or paste any token in the
 `bearer-jwt` section.
 
+
+### Secrets, permissions and vulnerabilities
+
+- [Secrets](docs/security/secrets.md): none in the repository, nor a default value for one; HashiCorp Vault
+  in production, rendered as files read through `ARCHIVE_SECRETS_DIR`; how to rotate each one. The
+  application does not start when a required setting is missing or empty.
+- [Permissions](docs/security/permissions.md): the database accounts of the migrations and of the
+  application, the storage account limited to the objects of the archive, and how to create them.
+- [Vulnerability policy](docs/security/vulnerability-policy.md): the dependency scan of the CI, the time to
+  fix by severity, and how a vulnerability may be accepted.
+- The `local` profile is for a developer machine only: it publishes the Swagger UI with the secret of a
+  local Keycloak client.
+
 ## Tests
 
 ```bash

@@ -1,5 +1,9 @@
 server:
   tomcat:
+    threads:
+      # Upper bound of the requests served at once by an instance, hence of the uploads written to its disk (51 MB each)
+      # and of the storage connections, which follow it.
+      max: ${ARCHIVE_MAX_THREADS:64}
     # A refused upload is read to its end, up to this size, so the client receives the 413 instead of a
     # connection reset. It stays above the multipart request limit below.
     max-swallow-size: 64MB
@@ -97,6 +101,7 @@ archive:
       secret-key: ${ARCHIVE_S3_SECRET_KEY:}
       path-style-access: ${ARCHIVE_S3_PATH_STYLE_ACCESS:true}
       api-call-timeout: ${ARCHIVE_S3_API_CALL_TIMEOUT:2m}
+      max-connections: ${server.tomcat.threads.max}
 
 # The OpenAPI description and the Swagger UI are public, so they are off unless explicitly enabled.
 springdoc:

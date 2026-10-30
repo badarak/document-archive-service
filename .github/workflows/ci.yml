@@ -116,6 +116,33 @@ jobs:
           docker push "$target"
           docker logout "$REGISTRY"
 
+  # The Helm chart renders, in both ways of delivering the secrets, into manifests valid for the oldest Kubernetes it
+  # supports.
+  chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CHART: deploy/helm/document-archive-service
+      KUBERNETES_VERSION: 1.30.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
+
+      - name: Lint and validate the chart
+        run: |
+          helm lint --strict "$CHART" --set image.tag=ci
+          mkdir -p rendered
+          helm template archive "$CHART" --kube-version "$KUBERNETES_VERSION" --set image.tag=ci > rendered/vault.yaml
+          helm template archive "$CHART" --kube-version "$KUBERNETES_VERSION" --set image.tag=ci \
+            --set secrets.vault.enabled=false --set secrets.existingSecret=application \
+            --set secrets.migrationExistingSecret=migration > rendered/secret.yaml
+          docker run --rm -v "$PWD/rendered:/rendered:ro" \
+            ghcr.io/yannh/kubeconform:v0.8.0@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e \
+            -strict -summary -kubernetes-version "$KUBERNETES_VERSION" /rendered/vault.yaml /rendered/secret.yaml
+
   # Refuses a pull request that adds or upgrades to a dependency with a known high or critical vulnerability.
   dependency-review:
     if: github.event_name == 'pull_request'

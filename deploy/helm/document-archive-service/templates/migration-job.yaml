@@ -1,0 +1,79 @@
+# Migrates the schema with the migrator account, then stops, before each install and upgrade: the new instances only
+# start once it succeeded, and a failure stops the release. A failed job is kept, for its logs, until the next release.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "archive.name" . }}-migration
+  labels:
+    {{- include "archive.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "archive.name" . }}-migration
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- if .Values.secrets.vault.enabled }}
+      annotations:
+        {{- $path := printf "secret/data/%s/%s" (include "archive.migrationName" .) .Values.secrets.vault.environment }}
+        {{- $role := printf "%s-%s" (include "archive.migrationName" .) .Values.secrets.vault.environment }}
+        {{- include "archive.vaultAnnotations" (dict "role" $role "path" $path "keys" (list "ARCHIVE_DB_MIGRATOR_PASSWORD")) | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "archive.migrationName" . }}
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "archive.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: migration
+          image: {{ include "archive.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /usr/bin/java
+            - -cp
+            - /app/BOOT-INF/classes:/app/BOOT-INF/lib/*
+            - com.badarak.archive.infrastructure.migration.SchemaMigrationKt
+          # From the values, not the ConfigMap: at the first install, the hook runs before the ConfigMap exists.
+          env:
+            - name: ARCHIVE_DB_URL
+              value: {{ required "config.ARCHIVE_DB_URL is required" .Values.config.ARCHIVE_DB_URL | quote }}
+            - name: ARCHIVE_DB_MIGRATOR_USERNAME
+              value: {{ .Values.migration.migratorUsername | quote }}
+          resources:
+            {{- toYaml .Values.migration.resources | nindent 12 }}
+          securityContext:
+            {{- include "archive.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if and (not .Values.secrets.vault.enabled) .Values.secrets.migrationExistingSecret }}
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        {{- if and (not .Values.secrets.vault.enabled) .Values.secrets.migrationExistingSecret }}
+        - name: secrets
+          secret:
+            secretName: {{ .Values.secrets.migrationExistingSecret }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

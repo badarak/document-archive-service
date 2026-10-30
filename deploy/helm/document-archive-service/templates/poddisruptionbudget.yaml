@@ -1,0 +1,12 @@
+# A node drain or a cluster upgrade never takes every instance at once.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "archive.name" . }}
+  labels:
+    {{- include "archive.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "archive.selectorLabels" . | nindent 6 }}

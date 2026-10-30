@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "archive.name" . }}
+  labels:
+    {{- include "archive.labels" . | nindent 4 }}
+data:
+  {{- range $name, $value := .Values.config }}
+  {{ $name }}: {{ $value | quote }}
+  {{- end }}
+  # The migration job runs them, with an account the application never sees.
+  ARCHIVE_DB_MIGRATIONS_ENABLED: "false"

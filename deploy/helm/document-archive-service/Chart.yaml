@@ -1,0 +1,9 @@
+apiVersion: v2
+name: document-archive-service
+description: Archive of the documents of the tenants, with their metadata, on an S3-compatible object storage.
+type: application
+# Version of the chart; the version of the application is the image tag, set at each deployment.
+version: 0.1.0
+appVersion: 0.1.0-SNAPSHOT
+# preStop sleep, used to leave the load balancers before the shutdown.
+kubeVersion: ">=1.30.0-0"

@@ -54,13 +54,16 @@ vault write auth/kubernetes/role/document-archive-service-<environment> \
   ttl=1h
 ```
 
-While the migrations run at startup, the application also reads `ARCHIVE_DB_MIGRATOR_PASSWORD`, from its own path.
-Once a migration job runs them, that job gets its own service account, role and policy on the `-migrations` path, and
-the running application no longer sees the migrator password.
+With the Helm chart (`deploy/helm`), the migrations run in a job of their own, with the service account
+`document-archive-service-migrations`, bound to a role and a policy on the `-migrations` path only: the running
+application never sees the migrator password. Only a deployment that runs the migrations at startup gives it to the
+application.
 
 ## Rendering the files
 
-With the Vault Agent Injector, the pod annotations render each key as a file of `/run/secrets`:
+With the Vault Agent Injector, the pod annotations render each key as a file of `/run/secrets`. The Helm chart writes
+them from `secrets.vault.environment`, with `agent-pre-populate-only`: the files are rendered once before the start,
+since the application reads them at startup only, and no sidecar keeps the migration job running.
 
 ```yaml
 metadata:

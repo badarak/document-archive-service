@@ -18,8 +18,14 @@ spring:
   lifecycle:
     # On shutdown, requests in progress are finished first. The wait exceeds the storage api-call-timeout, so that an
     # upload is not cut and its archiving left pending. The orchestrator must give at least as long before killing the
-    # process (terminationGracePeriodSeconds on Kubernetes).
+    # process (terminationGracePeriodSeconds on Kubernetes), counting also the wait for the reconciliation below.
     timeout-per-shutdown-phase: ${ARCHIVE_SHUTDOWN_TIMEOUT:150s}
+  task:
+    scheduling:
+      shutdown:
+        # A reconciliation run in progress finishes its current document before the instance stops.
+        await-termination: true
+        await-termination-period: ${ARCHIVE_RECONCILIATION_SHUTDOWN_TIMEOUT:30s}
   datasource:
     url: ${ARCHIVE_DB_URL}
     username: ${ARCHIVE_DB_USERNAME}

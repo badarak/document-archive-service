@@ -92,7 +92,7 @@ one is missing.
 | `ARCHIVE_S3_ROOT_USER`, `ARCHIVE_S3_ROOT_PASSWORD` | Root account of the MinIO container, for its console and its setup only |
 | `ARCHIVE_S3_ACCESS_KEY`, `ARCHIVE_S3_SECRET_KEY` | Object storage credentials of the application; locally, the setup of the MinIO container creates this account (see [permissions](docs/security/permissions.md)). Leave both empty to use the standard AWS chain (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, a profile, a web identity or an instance role); the application does not start without credentials |
 | `ARCHIVE_S3_API_CALL_TIMEOUT` | Optional. Longest time a storage call may take, retries included (`2m` by default) |
-| `MANAGEMENT_SERVER_PORT` | Optional. Port of the actuator endpoints (health probes and Prometheus), the application port by default; a separate port keeps them off the public network |
+| `MANAGEMENT_SERVER_PORT` | Optional. Port of the actuator endpoints (health and Prometheus), the application port by default; a separate port keeps them off the public network. The probes `/livez` and `/readyz` stay on the application port |
 | `ARCHIVE_OTLP_URL` | Optional. OTLP endpoint of the `observability` profile (`http://localhost:4318` by default) |
 | `ARCHIVE_GRAFANA_PORT`, `ARCHIVE_OTLP_PORT` | Optional. Ports of the Grafana container of the `observability` Compose profile (`3000` and `4318` by default) |
 | `ARCHIVE_TRACING_SAMPLING` | Optional. Share of the requests whose trace is recorded, from `0` to `1` (`0.1` by default, `1.0` with the `local` profile) |
@@ -100,6 +100,10 @@ one is missing.
 | `ARCHIVE_LOG_FORMAT` | Optional. Console log format: `ecs` (JSON lines, by default), `logstash`, `gelf`, or empty for the readable format of the `local` profile |
 | `ARCHIVE_LOG_TENANT` | Optional. Whether the log line of each API operation names the tenant of the caller (`false` by default) |
 | `ARCHIVE_SHUTDOWN_TIMEOUT` | Optional. Longest wait for the requests in progress on shutdown (`150s` by default). Keep it above `ARCHIVE_S3_API_CALL_TIMEOUT`, and give the orchestrator at least as long before it kills the process |
+| `ARCHIVE_RECONCILIATION_SHUTDOWN_TIMEOUT` | Optional. Longest wait for a reconciliation run in progress on shutdown (`30s` by default), on top of the wait above |
+| `ARCHIVE_MAX_THREADS` | Optional. Requests served at once by an instance (`64` by default), hence uploads written to its disk; the storage connections follow it |
+| `ARCHIVE_UPLOAD_DISK_THRESHOLD` | Optional. Free space under which the disk of the uploads takes the instance out of traffic through `/readyz` (`256MB` by default) |
+| `ARCHIVE_APP_PORT` | Optional. Published port of the `app` Compose profile (`8080` by default) |
 | `ARCHIVE_JWT_ISSUER`, `ARCHIVE_JWT_JWKS_URI`, `ARCHIVE_JWT_AUDIENCE` | Access token validation, see [Security](#security) |
 | `ARCHIVE_JWT_TENANT_CLAIM`, `ARCHIVE_JWT_SOURCE_CLAIM` | Optional. Token claims naming the caller's tenant and the calling service (`tenant_id` and `azp` by default) |
 | `ARCHIVE_JWT_ALGORITHMS` | Optional. Signature algorithms accepted from the issuer (`RS256` by default) |
@@ -351,6 +355,54 @@ with `globex-billing-service` and its secret in the same dialog, or paste any to
 - The `local` profile is for a developer machine only: it publishes the Swagger UI with the secret of a
   local Keycloak client.
 
+## Deployment
+
+The service is deployed as a container image on Kubernetes (1.30 or later), with Helm. The CI builds the image after the tests,
+checks that it runs as a non-root user, scans it with Trivy, and publishes it to Harbor from `master`, tagged with its
+commit (repository variables `HARBOR_REGISTRY` and `HARBOR_PROJECT`, secrets `HARBOR_USERNAME` and `HARBOR_PASSWORD` of
+a robot account allowed to push to that project only).
+
+### The image
+
+- Built by the `Dockerfile` from the sources, with the Maven Wrapper; the base images are pinned by digest.
+- Distroless Java 21 runtime: no shell nor package manager, user `65532`. The root file system can be read-only: the
+  uploads and the temporary files of the JVM go to `/tmp`, which must be a writable volume.
+- The heap takes 75 % of the memory limit of the container (`JAVA_TOOL_OPTIONS`, to override if needed).
+
+To run it locally against the Compose services, as in production:
+
+```bash
+docker compose --profile app up -d --build app    # http://localhost:8080, or ARCHIVE_APP_PORT
+docker compose stop app                           # graceful shutdown, as on a Kubernetes rollout
+docker compose --profile app down                 # also removes the app container
+```
+
+### Kubernetes
+
+The Helm chart `deploy/helm/document-archive-service` deploys the service (Helm 3 or 4). Its `values.yaml`
+lists every setting, with example URLs to replace in the values of each environment:
+
+```bash
+helm upgrade --install document-archive-service deploy/helm/document-archive-service \
+  --namespace archive --values production.yaml --set image.tag=<commit> --timeout 15m
+```
+
+- Before each install and upgrade, a hook `Job` migrates the schema with the migrator account, then stops. The new
+  instances only start once it succeeded; on a failure, the release stops and the job stays for its logs. The
+  application runs with the migrations off and never sees the migrator password.
+- The secrets are files of `/run/secrets`, rendered by the Vault agent (`secrets.vault`, see
+  [secrets](docs/security/secrets.md)), or taken from existing Kubernetes Secrets (`secrets.existingSecret` and
+  `secrets.migrationExistingSecret`) when Vault is off.
+- The CI lints the chart and validates what it renders against Kubernetes 1.30.
+
+| Aspect | Setting |
+|---|---|
+| Probes | Startup and liveness on `/livez`, readiness on `/readyz`, on the application port, public and without details. Neither depends on PostgreSQL nor on the storage: an outage of either would otherwise restart or remove every instance at once. The readiness fails when the disk of the uploads runs low |
+| Resources | 768 MiB of memory (request and limit), 500m CPU requested without limit, a 4 GiB `/tmp` volume; to confirm with a load test |
+| Shutdown | `preStop` of 10 s, so that the instance leaves the load balancers, then up to 150 s for the requests in progress and 30 s for a reconciliation run; `terminationGracePeriodSeconds: 200` |
+| Restart | The reconciliation runs as soon as an instance starts: the deletions left in progress are finished. An archiving cut by a stop is never published: it stays `PENDING`, is abandoned after the grace period (15 min), and the caller, who received no `201`, sends the file again |
+| Security | Non-root, read-only root file system, no capability, no privilege escalation, secrets from Vault as files (see [secrets](docs/security/secrets.md)) |
+
 ## Tests
 
 ```bash
@@ -370,6 +422,10 @@ Nothing is tested automatically against a real PostgreSQL or MinIO.
 - **The `archive` schema or the database accounts are missing**: the PostgreSQL init script only runs
   on an empty data volume. `docker compose down -v` deletes the volumes, so the next start replays
   it. This also erases the local data and the bucket, which the MinIO setup recreates.
+- **A container of a profile no longer starts (`network … not found`)**: `docker compose down` without the profile
+  removes the network but keeps the containers of the profiles it was not given. Stop with the same profiles as the
+  start (`docker compose --profile app --profile observability down`), or recreate the container with
+  `--force-recreate`.
 - **The container name `miniostorage` is already in use**: the name is fixed, so two copies of the
   project cannot run on the same machine at the same time.
 

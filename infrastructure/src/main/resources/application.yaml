@@ -143,3 +143,8 @@ management:
       show-details: never
       probes:
         enabled: true
+    # Not exposed; should they ever be, they show the names of the settings, never their values.
+    env:
+      show-values: never
+    configprops:
+      show-values: never

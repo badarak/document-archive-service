@@ -64,6 +64,58 @@ jobs:
           trivy sbom --quiet --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --ignorefile .trivyignore.yaml \
             infrastructure/target/classes/META-INF/sbom/application.cdx.json
 
+  # Builds the image once the tests pass, checks that it runs as a non-root user and scans it, also every working day.
+  # Only a push to master publishes it, to Harbor, tagged with its commit.
+  image:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      IMAGE: document-archive-service:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image
+        run: docker build --tag "$IMAGE" .
+
+      - name: Check that the image runs as a non-root user
+        run: |
+          user=$(docker image inspect --format '{{.Config.User}}' "$IMAGE")
+          case "${user%%:*}" in
+            '' | 0 | *[!0-9]*) echo "::error::The image must run as a numeric non-root user, not '$user'"; exit 1 ;;
+          esac
+
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+          cache: true
+
+      # Same policy as the dependencies, applied to the packages of the base image as well.
+      - name: Scan the image
+        run: |
+          trivy image --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --ignorefile .trivyignore.yaml "$IMAGE"
+          trivy image --quiet --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --ignorefile .trivyignore.yaml "$IMAGE"
+
+      # HARBOR_REGISTRY and HARBOR_PROJECT are repository variables; HARBOR_USERNAME and HARBOR_PASSWORD, the secrets of a
+      # Harbor robot account allowed to push to that project only.
+      - name: Publish the image to Harbor
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          REGISTRY: ${{ vars.HARBOR_REGISTRY }}
+          PROJECT: ${{ vars.HARBOR_PROJECT }}
+          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        run: |
+          if [ -z "$REGISTRY" ] || [ -z "$PROJECT" ]; then
+            echo "::warning::Image not published: set the HARBOR_REGISTRY and HARBOR_PROJECT variables of the repository"
+            exit 0
+          fi
+          target="$REGISTRY/$PROJECT/document-archive-service:$GITHUB_SHA"
+          echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" --username "$HARBOR_USERNAME" --password-stdin
+          docker tag "$IMAGE" "$target"
+          docker push "$target"
+          docker logout "$REGISTRY"
+
   # Refuses a pull request that adds or upgrades to a dependency with a known high or critical vulnerability.
   dependency-review:
     if: github.event_name == 'pull_request'

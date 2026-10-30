@@ -1,4 +1,5 @@
-# Weekly updates of the Maven dependencies and of the GitHub Actions of the CI, grouped to keep the pull requests few.
+# Weekly updates of the Maven dependencies, of the base images of the Dockerfile and of the GitHub Actions of the CI,
+# grouped to keep the pull requests few.
 # Security updates, for a known vulnerability, are opened at once whatever this schedule.
 version: 2
 updates:
@@ -23,5 +24,15 @@ updates:
       interval: weekly
     groups:
       actions:
+        patterns:
+          - "*"
+
+  # The base images are pinned by digest: Dependabot proposes the new digest of the same tag, and newer tags.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
         patterns:
           - "*"

@@ -23,6 +23,8 @@ class SecurityConfiguration {
                 authorize(DispatcherTypeRequestMatcher(DispatcherType.ERROR), permitAll)
                 authorize("/actuator/health", permitAll)
                 authorize("/actuator/health/**", permitAll)
+                authorize(HttpMethod.GET, "/livez", permitAll)
+                authorize(HttpMethod.GET, "/readyz", permitAll)
                 authorize(HttpMethod.GET, "/actuator/prometheus", hasAuthority(READ_METRICS))
                 authorize("/v3/api-docs", permitAll)
                 authorize("/v3/api-docs/**", permitAll)

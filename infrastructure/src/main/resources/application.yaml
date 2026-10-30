@@ -118,6 +118,12 @@ springdoc:
     enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
 
 management:
+  health:
+    diskspace:
+      # The uploads are written to this disk before being stored: an instance that cannot take a few more stops
+      # receiving traffic instead of answering 500.
+      path: ${SPRING_SERVLET_MULTIPART_LOCATION:${java.io.tmpdir}}
+      threshold: ${ARCHIVE_UPLOAD_DISK_THRESHOLD:256MB}
   # Traces: every request gets a trace whose identifier is in the MDC, hence in every log line and error answer. A share
   # of them is recorded, and sent only once MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT names an OTLP collector.
   tracing:
@@ -143,6 +149,15 @@ management:
       show-details: never
       probes:
         enabled: true
+        # The probes are also served on the application port, as /livez and /readyz: a probe on the management port
+        # would answer UP while the application connector is stuck.
+        add-additional-paths: true
+      group:
+        # The liveness never depends on PostgreSQL nor on the storage: an outage of either would restart every instance
+        # in a loop. Nor does the readiness, since they fail for every instance at once and each request already answers
+        # 503. The readiness only adds the disk that receives the uploads.
+        readiness:
+          include: readinessState,diskSpace
     # Not exposed; should they ever be, they show the names of the settings, never their values.
     env:
       show-values: never

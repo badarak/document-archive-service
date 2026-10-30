@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
+    branches: [master]
   # New vulnerabilities are published every day, also in dependencies that do not change.
   schedule:
     - cron: "0 5 * * 1-5"

@@ -6,7 +6,7 @@ in PostgreSQL; the binary content goes to an S3-compatible object storage (MinIO
 ## Prerequisites
 
 - JDK 21
-- Maven 3.9 or later
+- No Maven installation: `./mvnw` downloads the pinned version (3.9.16) and checks its checksum
 - Docker with Docker Compose v2
 - `jq`, to read the access token in the local examples
 
@@ -58,7 +58,7 @@ docker compose up -d
 ### 3. Start the application
 
 ```bash
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
 The command builds the modules and starts the application with the `local` profile. Liquibase
@@ -114,7 +114,7 @@ one is missing.
 ## The `local` profile
 
 The `local` profile only loads the `.env` file, so the application reads the same values as Docker
-Compose. Without it, the variables must be set in the environment. `mvn spring-boot:run`
+Compose. Without it, the variables must be set in the environment. `./mvnw spring-boot:run`
 activates it by itself.
 
 The file is looked up in the working directory and in its parent: start the application from the
@@ -248,7 +248,7 @@ metrics, logs and traces to it over OTLP:
 
 ```bash
 docker compose --profile observability up -d
-mvn spring-boot:run -Dspring-boot.run.profiles=local,observability   # or both profiles in the IDE
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local,observability   # or both profiles in the IDE
 ```
 
 Open <http://localhost:3000> (`admin` / `admin`): the **Document Archive Service** dashboard shows the
@@ -354,8 +354,8 @@ with `globex-billing-service` and its secret in the same dialog, or paste any to
 ## Tests
 
 ```bash
-mvn test      # unit tests only
-mvn verify    # unit and integration tests, code style and the 80 % coverage threshold
+./mvnw test      # unit tests only
+./mvnw verify    # unit and integration tests, code style and the 80 % coverage threshold
 ```
 
 - **Unit tests** are named `*Test`. They use JUnit and MockK, and start no Spring context.

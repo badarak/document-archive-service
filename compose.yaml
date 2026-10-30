@@ -96,10 +96,11 @@ services:
       ARCHIVE_JWT_AUDIENCE: ${ARCHIVE_JWT_AUDIENCE:?set it in .env}
     ports:
       - "${ARCHIVE_APP_PORT:-8080}:8080"
-    # As on Kubernetes: read-only root file system, the uploads on a temporary file system, no privilege.
+    # As on Kubernetes: read-only root file system, no privilege, and the uploads on a disk volume: a tmpfs would count
+    # them in the memory of the container.
     read_only: true
-    tmpfs:
-      - /tmp:size=2g
+    volumes:
+      - /tmp
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 768m

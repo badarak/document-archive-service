@@ -4,6 +4,9 @@ on:
   push:
     branches: [master]
   pull_request:
+  # New vulnerabilities are published every day, also in dependencies that do not change.
+  schedule:
+    - cron: "0 5 * * 1-5"
 
 # Cancel superseded runs on the same branch or pull request.
 concurrency:
@@ -13,27 +16,60 @@ concurrency:
 permissions:
   contents: read
 
+# Actions are pinned to a commit, which a tag cannot be moved to; Dependabot keeps them up to date.
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: 21
           cache: maven
 
-      # Runs unit and integration tests, ktlint, the enforcer rules and the aggregated coverage threshold.
+      # Runs unit and integration tests, ktlint, the enforcer rules and the aggregated coverage threshold, and writes the
+      # software bill of materials of the application.
       - name: Build and verify
         run: mvn -B -ntp clean verify
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: jacoco-aggregate-report
           path: report/target/site/jacoco-aggregate/
           if-no-files-found: ignore
+
+      - name: Upload software bill of materials
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom
+          path: infrastructure/target/classes/META-INF/sbom/application.cdx.json
+
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+          cache: true
+
+      # Fails on any critical or high vulnerability that has a fix, unless .trivyignore.yaml accepts it until a date
+      # (docs/security/vulnerability-policy.md). The table lists every finding, the medium ones included.
+      - name: Scan the dependencies
+        run: |
+          trivy sbom --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --ignorefile .trivyignore.yaml \
+            infrastructure/target/classes/META-INF/sbom/application.cdx.json
+          trivy sbom --quiet --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --ignorefile .trivyignore.yaml \
+            infrastructure/target/classes/META-INF/sbom/application.cdx.json
+
+  # Refuses a pull request that adds or upgrades to a dependency with a known high or critical vulnerability.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high

@@ -1,0 +1,10 @@
+# Vulnerabilities accepted by the dependency and image scans (docs/security/vulnerability-policy.md). Each entry names
+# why it is accepted and until when: past its expiry date, the scan fails again on it. Example:
+#
+# vulnerabilities:
+#   - id: CVE-2026-00000
+#     purls:
+#       - pkg:maven/org.example/library@1.2.3
+#     statement: "Not reachable: the service never calls the vulnerable parser. Owner: @badarak"
+#     expired_at: 2026-12-31
+vulnerabilities: []

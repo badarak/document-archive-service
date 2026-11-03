@@ -12,6 +12,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation
 import software.amazon.awssdk.core.checksums.ResponseChecksumValidation
 import software.amazon.awssdk.core.exception.SdkClientException
+import software.amazon.awssdk.http.apache5.Apache5HttpClient
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 
@@ -28,6 +29,7 @@ class S3StorageConfiguration {
         .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
         .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
         .overrideConfiguration { it.apiCallTimeout(properties.apiCallTimeout) }
+        .httpClientBuilder(Apache5HttpClient.builder().maxConnections(properties.maxConnections))
         .build()
 
     /**

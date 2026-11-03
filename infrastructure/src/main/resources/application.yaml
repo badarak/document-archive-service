@@ -1,5 +1,9 @@
 server:
   tomcat:
+    threads:
+      # Upper bound of the requests served at once by an instance, hence of the uploads written to its disk (51 MB each)
+      # and of the storage connections, which follow it.
+      max: ${ARCHIVE_MAX_THREADS:64}
     # A refused upload is read to its end, up to this size, so the client receives the 413 instead of a
     # connection reset. It stays above the multipart request limit below.
     max-swallow-size: 64MB
@@ -14,8 +18,14 @@ spring:
   lifecycle:
     # On shutdown, requests in progress are finished first. The wait exceeds the storage api-call-timeout, so that an
     # upload is not cut and its archiving left pending. The orchestrator must give at least as long before killing the
-    # process (terminationGracePeriodSeconds on Kubernetes).
+    # process (terminationGracePeriodSeconds on Kubernetes), counting also the wait for the reconciliation below.
     timeout-per-shutdown-phase: ${ARCHIVE_SHUTDOWN_TIMEOUT:150s}
+  task:
+    scheduling:
+      shutdown:
+        # A reconciliation run in progress finishes its current document before the instance stops.
+        await-termination: true
+        await-termination-period: ${ARCHIVE_RECONCILIATION_SHUTDOWN_TIMEOUT:30s}
   datasource:
     url: ${ARCHIVE_DB_URL}
     username: ${ARCHIVE_DB_USERNAME}
@@ -97,6 +107,7 @@ archive:
       secret-key: ${ARCHIVE_S3_SECRET_KEY:}
       path-style-access: ${ARCHIVE_S3_PATH_STYLE_ACCESS:true}
       api-call-timeout: ${ARCHIVE_S3_API_CALL_TIMEOUT:2m}
+      max-connections: ${server.tomcat.threads.max}
 
 # The OpenAPI description and the Swagger UI are public, so they are off unless explicitly enabled.
 springdoc:
@@ -118,6 +129,12 @@ springdoc:
     enabled: ${ARCHIVE_OPENAPI_ENABLED:false}
 
 management:
+  health:
+    diskspace:
+      # The uploads are written to this disk before being stored: an instance that cannot take a few more stops
+      # receiving traffic instead of answering 500.
+      path: ${SPRING_SERVLET_MULTIPART_LOCATION:${java.io.tmpdir}}
+      threshold: ${ARCHIVE_UPLOAD_DISK_THRESHOLD:256MB}
   # Traces: every request gets a trace whose identifier is in the MDC, hence in every log line and error answer. A share
   # of them is recorded, and sent only once MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT names an OTLP collector.
   tracing:
@@ -143,6 +160,15 @@ management:
       show-details: never
       probes:
         enabled: true
+        # The probes are also served on the application port, as /livez and /readyz: a probe on the management port
+        # would answer UP while the application connector is stuck.
+        add-additional-paths: true
+      group:
+        # The liveness never depends on PostgreSQL nor on the storage: an outage of either would restart every instance
+        # in a loop. Nor does the readiness, since they fail for every instance at once and each request already answers
+        # 503. The readiness only adds the disk that receives the uploads.
+        readiness:
+          include: readinessState,diskSpace
     # Not exposed; should they ever be, they show the names of the settings, never their values.
     env:
       show-values: never

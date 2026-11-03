@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "archive.name" . }}
+  labels:
+    {{- include "archive.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      {{- include "archive.selectorLabels" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        {{- include "archive.selectorLabels" . | nindent 8 }}
+      annotations:
+        # The settings are read at startup: a change of them restarts the instances.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.secrets.vault.enabled }}
+        {{- $path := printf "secret/data/%s/%s" (include "archive.name" .) .Values.secrets.vault.environment }}
+        {{- $role := printf "%s-%s" (include "archive.name" .) .Values.secrets.vault.environment }}
+        {{- include "archive.vaultAnnotations" (dict "role" $role "path" $path "keys" (list "ARCHIVE_DB_PASSWORD" "ARCHIVE_S3_ACCESS_KEY" "ARCHIVE_S3_SECRET_KEY")) | nindent 8 }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "archive.name" . }}
+      terminationGracePeriodSeconds: {{ .Values.shutdown.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "archive.podSecurityContext" . | nindent 8 }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "archive.selectorLabels" . | nindent 14 }}
+      containers:
+        - name: application
+          image: {{ include "archive.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: {{ include "archive.name" . }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          # On the application port, as the traffic; neither depends on PostgreSQL nor on the storage (application.yaml).
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: {{ .Values.shutdown.preStopSeconds }}
+          securityContext:
+            {{- include "archive.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if and (not .Values.secrets.vault.enabled) .Values.secrets.existingSecret }}
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.uploadVolume.sizeLimit }}
+        {{- if and (not .Values.secrets.vault.enabled) .Values.secrets.existingSecret }}
+        - name: secrets
+          secret:
+            secretName: {{ .Values.secrets.existingSecret }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

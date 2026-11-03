@@ -1,0 +1,77 @@
+# Image published to Harbor by the CI, tagged with its commit. The tag is required: helm upgrade --set image.tag=<sha>.
+image:
+  repository: harbor.example.com/archive/document-archive-service
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+replicaCount: 2
+
+# Settings of the application, as environment variables (README, "Environment variables"). No secret here.
+config:
+  ARCHIVE_DB_URL: jdbc:postgresql://postgres.example.internal:5432/archive
+  ARCHIVE_DB_USERNAME: archive_app
+  ARCHIVE_S3_ENDPOINT: https://ACCOUNT_ID.r2.cloudflarestorage.com
+  ARCHIVE_S3_REGION: auto
+  ARCHIVE_S3_BUCKET: archive-documents
+  ARCHIVE_JWT_ISSUER: https://auth.example.com/realms/archive
+  ARCHIVE_JWT_JWKS_URI: https://auth.example.com/realms/archive/protocol/openid-connect/certs
+  ARCHIVE_JWT_AUDIENCE: document-archive-service
+
+# The secrets are files of /run/secrets, one per variable (docs/security/secrets.md), rendered by the Vault agent, or
+# taken from an existing Kubernetes Secret when Vault is off.
+secrets:
+  vault:
+    enabled: true
+    # Names the Vault roles (document-archive-service-<environment>, document-archive-service-migrations-<environment>)
+    # and paths (secret/data/document-archive-service/<environment>, secret/data/document-archive-service-migrations/...).
+    environment: production
+  # Without Vault: Secrets holding ARCHIVE_DB_PASSWORD, ARCHIVE_S3_ACCESS_KEY and ARCHIVE_S3_SECRET_KEY for the
+  # application, and ARCHIVE_DB_MIGRATOR_PASSWORD for the migration.
+  existingSecret: ""
+  migrationExistingSecret: ""
+
+# The heap takes 75 % of the memory limit. No CPU limit: throttling slows the startup and the garbage collector down.
+# A starting point, to confirm with a load test.
+resources:
+  requests:
+    cpu: 500m
+    memory: 768Mi
+    ephemeral-storage: 1Gi
+  limits:
+    memory: 768Mi
+    ephemeral-storage: 5Gi
+
+# The uploads in progress (ARCHIVE_MAX_THREADS, 64 by default, of 51 MB at most) and the temporary files of the JVM.
+uploadVolume:
+  sizeLimit: 4Gi
+
+shutdown:
+  # Time to leave the load balancers before the instance stops accepting requests.
+  preStopSeconds: 10
+  # Above preStopSeconds, the 150 s given to the requests in progress and the 30 s given to the reconciliation.
+  terminationGracePeriodSeconds: 200
+
+service:
+  type: ClusterIP
+  port: 80
+
+podDisruptionBudget:
+  minAvailable: 1
+
+# Migrates the schema with the migrator account before each install and upgrade; the application never runs them.
+migration:
+  migratorUsername: archive_migrator
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 512Mi
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

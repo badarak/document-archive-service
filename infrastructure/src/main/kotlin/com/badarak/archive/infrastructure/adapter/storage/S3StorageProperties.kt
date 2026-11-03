@@ -2,6 +2,7 @@ package com.badarak.archive.infrastructure.adapter.storage
 
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Positive
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.validation.annotation.Validated
 import java.net.URI
@@ -13,6 +14,8 @@ import java.time.Duration
  *
  * The credentials are either both [accessKey] and [secretKey], or neither: the standard AWS chain then finds them
  * (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, a profile file, a web identity or an instance role).
+ *
+ * [maxConnections] follows the number of request threads: beyond it, an upload would wait for a connection, then fail.
  *
  * Not a data class, so the secret key never ends up in a generated toString().
  */
@@ -26,6 +29,7 @@ class S3StorageProperties(
     secretKey: String? = null,
     val pathStyleAccess: Boolean = true,
     val apiCallTimeout: Duration = Duration.ofMinutes(2),
+    @field:Positive val maxConnections: Int = 64,
 ) {
     val endpoint: URI? = endpoint?.takeUnless { it.toString().isBlank() }
     val accessKey: String? = accessKey?.takeUnless { it.isBlank() }

@@ -32,6 +32,17 @@ class HealthEndpointIT {
     }
 
     @Test
+    fun `the probes are also served on the application port, without details`() {
+        listOf("/livez", "/readyz").forEach { path ->
+            mockMvc.get(path).andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("UP") }
+                jsonPath("$.components") { doesNotExist() }
+            }
+        }
+    }
+
+    @Test
     fun `other actuator paths are not open to anonymous callers`() {
         mockMvc.get("/actuator/info").andExpect { status { isUnauthorized() } }
         mockMvc.get("/actuator/env").andExpect { status { isUnauthorized() } }

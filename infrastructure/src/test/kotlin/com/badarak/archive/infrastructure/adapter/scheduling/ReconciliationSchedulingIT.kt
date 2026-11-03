@@ -42,5 +42,12 @@ class ReconciliationSchedulingIT {
 
             assertEquals(listOf(Duration.ofHours(1)), delays)
         }
+
+        @Test
+        fun `the reconciliation runs as soon as the instance starts, to resume what a stopped instance left`() {
+            val initialDelays = tasks.scheduledTasks.map { it.task }.filterIsInstance<FixedDelayTask>().map { it.initialDelayDuration }
+
+            assertEquals(listOf(Duration.ZERO), initialDelays)
+        }
     }
 }

@@ -34,7 +34,7 @@ jobs:
       # Runs unit and integration tests, ktlint, the enforcer rules and the aggregated coverage threshold, and writes the
       # software bill of materials of the application.
       - name: Build and verify
-        run: mvn -B -ntp clean verify
+        run: ./mvnw -B -ntp clean verify
 
       - name: Upload coverage report
         if: always()
@@ -63,6 +63,111 @@ jobs:
             infrastructure/target/classes/META-INF/sbom/application.cdx.json
           trivy sbom --quiet --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --ignorefile .trivyignore.yaml \
             infrastructure/target/classes/META-INF/sbom/application.cdx.json
+
+  # Builds the image once the tests pass, checks that it runs as a non-root user and scans it, also every working day.
+  image:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      IMAGE: document-archive-service:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build the image
+        run: docker build --tag "$IMAGE" .
+
+      - name: Check that the image runs as a non-root user
+        run: |
+          user=$(docker image inspect --format '{{.Config.User}}' "$IMAGE")
+          case "${user%%:*}" in
+            '' | 0 | *[!0-9]*) echo "::error::The image must run as a numeric non-root user, not '$user'"; exit 1 ;;
+          esac
+
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+          cache: true
+
+      # Same policy as the dependencies, applied to the packages of the base image as well.
+      - name: Scan the image
+        run: |
+          trivy image --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --ignorefile .trivyignore.yaml "$IMAGE"
+          trivy image --quiet --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --ignorefile .trivyignore.yaml "$IMAGE"
+
+      # Only the image of master is published, by the job below: it is handed over as an artifact of this run.
+      - name: Save the image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: docker save "$IMAGE" | gzip > image.tar.gz
+
+      - name: Hand the image over to the publication
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image
+          path: image.tar.gz
+          retention-days: 1
+
+  # Publishes the scanned image of master to Harbor, tagged with its commit. The only job that receives the credentials
+  # of the Harbor robot account, with no third-party action: they are secrets of the harbor environment, which only
+  # master may use (HARBOR_USERNAME, HARBOR_PASSWORD; variables HARBOR_REGISTRY and HARBOR_PROJECT).
+  publish:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: harbor
+    env:
+      IMAGE: document-archive-service:${{ github.sha }}
+      REGISTRY: ${{ vars.HARBOR_REGISTRY }}
+      PROJECT: ${{ vars.HARBOR_PROJECT }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image
+
+      - name: Publish the image to Harbor
+        env:
+          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        run: |
+          if [ -z "$REGISTRY" ] || [ -z "$PROJECT" ]; then
+            echo "::warning::Image not published: set HARBOR_REGISTRY and HARBOR_PROJECT in the harbor environment"
+            exit 0
+          fi
+          target="$REGISTRY/$PROJECT/document-archive-service:$GITHUB_SHA"
+          docker load --input image.tar.gz
+          docker tag "$IMAGE" "$target"
+          echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" --username "$HARBOR_USERNAME" --password-stdin
+          docker push "$target"
+          docker logout "$REGISTRY"
+
+  # The Helm chart renders, in both ways of delivering the secrets, into manifests valid for the oldest Kubernetes it
+  # supports.
+  chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CHART: deploy/helm/document-archive-service
+      KUBERNETES_VERSION: 1.30.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
+
+      - name: Lint and validate the chart
+        run: |
+          helm lint --strict "$CHART" --set image.tag=ci
+          mkdir -p rendered
+          helm template archive "$CHART" --kube-version "$KUBERNETES_VERSION" --set image.tag=ci > rendered/vault.yaml
+          helm template archive "$CHART" --kube-version "$KUBERNETES_VERSION" --set image.tag=ci \
+            --set secrets.vault.enabled=false --set secrets.existingSecret=application \
+            --set secrets.migrationExistingSecret=migration > rendered/secret.yaml
+          docker run --rm -v "$PWD/rendered:/rendered:ro" \
+            ghcr.io/yannh/kubeconform:v0.8.0@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e \
+            -strict -summary -kubernetes-version "$KUBERNETES_VERSION" /rendered/vault.yaml /rendered/secret.yaml
 
   # Refuses a pull request that adds or upgrades to a dependency with a known high or critical vulnerability.
   dependency-review:

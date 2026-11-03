@@ -18,6 +18,8 @@
         <spring-boot.run.skip>false</spring-boot.run.skip>
         <!-- spring-boot:run is a development command, so it reads the local .env file. -->
         <spring-boot.run.profiles>local</spring-boot.run.profiles>
+        <!-- The jar also holds the schema migration, started on its own by the migration job. -->
+        <start-class>com.badarak.archive.DocumentArchiveApplicationKt</start-class>
     </properties>
 
     <dependencies>
@@ -87,6 +89,10 @@
                     <artifactId>netty-nio-client</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache5-client</artifactId>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>

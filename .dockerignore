@@ -1,0 +1,10 @@
+# Only what the build needs: everything else, the local .env with its secrets first, stays out of the image context.
+*
+!mvnw
+!.mvn/wrapper/maven-wrapper.properties
+!pom.xml
+!domain/pom.xml
+!domain/src
+!infrastructure/pom.xml
+!infrastructure/src
+!report/pom.xml

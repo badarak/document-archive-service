@@ -65,6 +65,48 @@ services:
     volumes:
       - ./docker/keycloak:/opt/keycloak/data/import:ro
 
+  # The application from its image, started only with "docker compose --profile app up --build": checks the image, its
+  # probes and its shutdown ("docker compose stop app") as they run in production. Inside Compose, the services are
+  # reached by their names; the tokens still name the issuer as http://localhost:8180, as when they are requested from
+  # the host.
+  app:
+    build: .
+    image: document-archive-service:local
+    profiles: [app]
+    depends_on:
+      postgres:
+        condition: service_started
+      keycloak:
+        condition: service_started
+      minio-setup:
+        condition: service_completed_successfully
+    environment:
+      ARCHIVE_DB_URL: jdbc:postgresql://postgres:5432/${ARCHIVE_DB_NAME:?set it in .env}
+      ARCHIVE_DB_USERNAME: ${ARCHIVE_DB_USERNAME:?set it in .env}
+      ARCHIVE_DB_PASSWORD: ${ARCHIVE_DB_PASSWORD:?set it in .env}
+      ARCHIVE_DB_MIGRATOR_USERNAME: ${ARCHIVE_DB_MIGRATOR_USERNAME:?set it in .env}
+      ARCHIVE_DB_MIGRATOR_PASSWORD: ${ARCHIVE_DB_MIGRATOR_PASSWORD:?set it in .env}
+      ARCHIVE_S3_ENDPOINT: http://minio:9000
+      ARCHIVE_S3_REGION: ${ARCHIVE_S3_REGION:?set it in .env}
+      ARCHIVE_S3_BUCKET: ${ARCHIVE_S3_BUCKET:?set it in .env}
+      ARCHIVE_S3_ACCESS_KEY: ${ARCHIVE_S3_ACCESS_KEY:?set it in .env}
+      ARCHIVE_S3_SECRET_KEY: ${ARCHIVE_S3_SECRET_KEY:?set it in .env}
+      ARCHIVE_JWT_ISSUER: ${ARCHIVE_JWT_ISSUER:?set it in .env}
+      ARCHIVE_JWT_JWKS_URI: http://keycloak:8080/realms/archive/protocol/openid-connect/certs
+      ARCHIVE_JWT_AUDIENCE: ${ARCHIVE_JWT_AUDIENCE:?set it in .env}
+    ports:
+      - "${ARCHIVE_APP_PORT:-8080}:8080"
+    # As on Kubernetes: read-only root file system, no privilege, and the uploads on a disk volume: a tmpfs would count
+    # them in the memory of the container.
+    read_only: true
+    volumes:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    # Longer than the wait for the requests in progress (150 s) and for the reconciliation (30 s).
+    stop_grace_period: 200s
+
   # Local observability, started only with "docker compose --profile observability up": Grafana with Prometheus, Loki
   # and Tempo, which receive the metrics, logs and traces the application pushes over OTLP with its observability
   # profile. Grafana is on http://localhost:3000, with the dashboard of docker/grafana already loaded.

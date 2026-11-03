@@ -357,10 +357,19 @@ with `globex-billing-service` and its secret in the same dialog, or paste any to
 
 ## Deployment
 
-The service is deployed as a container image on Kubernetes (1.30 or later), with Helm. The CI builds the image after the tests,
-checks that it runs as a non-root user, scans it with Trivy, and publishes it to Harbor from `master`, tagged with its
-commit (repository variables `HARBOR_REGISTRY` and `HARBOR_PROJECT`, secrets `HARBOR_USERNAME` and `HARBOR_PASSWORD` of
-a robot account allowed to push to that project only).
+The service is deployed as a container image on Kubernetes (1.30 or later), with Helm. The CI builds the image after
+the tests, checks that it runs as a non-root user and scans it with Trivy. From `master` only, a job of its own then
+publishes it to Harbor, tagged with its commit.
+
+The Harbor settings belong to a GitHub environment named `harbor`, whose deployment branches are limited to `master`:
+GitHub hands its secrets to no other branch, nor to a pull request.
+
+| Setting of the `harbor` environment | Content |
+|---|---|
+| Variables `HARBOR_REGISTRY`, `HARBOR_PROJECT` | Host of the registry and project of the image |
+| Secrets `HARBOR_USERNAME`, `HARBOR_PASSWORD` | Robot account allowed to push and pull in that project only, with an expiry date |
+
+On the Harbor side, an immutable tag rule on the project keeps a published image from being replaced.
 
 ### The image
 

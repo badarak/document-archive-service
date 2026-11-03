@@ -65,7 +65,6 @@ jobs:
             infrastructure/target/classes/META-INF/sbom/application.cdx.json
 
   # Builds the image once the tests pass, checks that it runs as a non-root user and scans it, also every working day.
-  # Only a push to master publishes it, to Harbor, tagged with its commit.
   image:
     needs: build
     runs-on: ubuntu-latest
@@ -96,23 +95,50 @@ jobs:
           trivy image --severity CRITICAL,HIGH,MEDIUM --ignore-unfixed --ignorefile .trivyignore.yaml "$IMAGE"
           trivy image --quiet --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --ignorefile .trivyignore.yaml "$IMAGE"
 
-      # HARBOR_REGISTRY and HARBOR_PROJECT are repository variables; HARBOR_USERNAME and HARBOR_PASSWORD, the secrets of a
-      # Harbor robot account allowed to push to that project only.
-      - name: Publish the image to Harbor
+      # Only the image of master is published, by the job below: it is handed over as an artifact of this run.
+      - name: Save the image
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: docker save "$IMAGE" | gzip > image.tar.gz
+
+      - name: Hand the image over to the publication
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image
+          path: image.tar.gz
+          retention-days: 1
+
+  # Publishes the scanned image of master to Harbor, tagged with its commit. The only job that receives the credentials
+  # of the Harbor robot account, with no third-party action: they are secrets of the harbor environment, which only
+  # master may use (HARBOR_USERNAME, HARBOR_PASSWORD; variables HARBOR_REGISTRY and HARBOR_PROJECT).
+  publish:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: harbor
+    env:
+      IMAGE: document-archive-service:${{ github.sha }}
+      REGISTRY: ${{ vars.HARBOR_REGISTRY }}
+      PROJECT: ${{ vars.HARBOR_PROJECT }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image
+
+      - name: Publish the image to Harbor
         env:
-          REGISTRY: ${{ vars.HARBOR_REGISTRY }}
-          PROJECT: ${{ vars.HARBOR_PROJECT }}
           HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
           HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
         run: |
           if [ -z "$REGISTRY" ] || [ -z "$PROJECT" ]; then
-            echo "::warning::Image not published: set the HARBOR_REGISTRY and HARBOR_PROJECT variables of the repository"
+            echo "::warning::Image not published: set HARBOR_REGISTRY and HARBOR_PROJECT in the harbor environment"
             exit 0
           fi
           target="$REGISTRY/$PROJECT/document-archive-service:$GITHUB_SHA"
-          echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" --username "$HARBOR_USERNAME" --password-stdin
+          docker load --input image.tar.gz
           docker tag "$IMAGE" "$target"
+          echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" --username "$HARBOR_USERNAME" --password-stdin
           docker push "$target"
           docker logout "$REGISTRY"
 

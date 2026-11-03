@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Base images are pinned by digest, so a build gets the same bytes until Dependabot proposes newer ones.
-FROM eclipse-temurin:21-jdk-noble@sha256:bd6ac06e2a2df928af21c75c4a8a0f2829a93377a65761d6a577bb32281e2ac3 AS build
+FROM eclipse-temurin:24-jdk-noble@sha256:dacac8e9a0df0d2bd24e702b4431132875c249930b70555ebd7ca285b5bee684 AS build
 WORKDIR /workspace
 
 # The Maven Wrapper checks the checksum of the zip distribution, which it only downloads when unzip is available.
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     && java -Djarmode=tools -jar application.jar extract --layers --launcher --destination extracted
 
 # No shell nor package manager, and a non-root user: the probes and the logs are the way to look inside.
-FROM gcr.io/distroless/java21-debian13:nonroot@sha256:ba6c75fda24af8a9aee3ec7633bd7369ee390c054d4e4292d52f17014cc9a11a
+FROM gcr.io/distroless/java21-debian13:nonroot@sha256:b22857e939bd95abd69d9d747f0421a274f9f70855ecfc335f7d97f6eeef578d
 WORKDIR /app
 
 COPY --from=build /workspace/extracted/dependencies/ ./
